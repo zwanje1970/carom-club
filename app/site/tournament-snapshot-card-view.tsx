@@ -161,6 +161,8 @@ function MediaStack({
   onRepImageLoad,
   isImageCaptureMode,
   forceHeroImageCrossOrigin,
+  gradientLayerClass,
+  gradientOpacity,
 }: {
   variant: SlidePreviewVariant;
   item: TournamentSlidePreviewItem;
@@ -176,6 +178,9 @@ function MediaStack({
   isImageCaptureMode?: boolean;
   /** 편집 미리보기 등: 첫 페인트부터 CORS 가능한 히어로 이미지(캡처용) */
   forceHeroImageCrossOrigin?: boolean;
+  /** 배경·오버레이 위, 본문 아래 가독성 그라데이션 */
+  gradientLayerClass?: string;
+  gradientOpacity?: number;
 }) {
   const solidBackdrop = slideDeckSolidBackdrop?.trim();
   const cssBg = item.mediaBackground?.trim();
@@ -228,6 +233,13 @@ function MediaStack({
           {...(isImageCaptureMode || forceHeroImageCrossOrigin ? { crossOrigin: "anonymous" as const } : {})}
           {...(repImageHighPriority ? { fetchPriority: "high" as const } : {})}
           onLoad={repImageHighPriority && onRepImageLoad ? fireRepImageLoad : undefined}
+        />
+      ) : null}
+      {gradientLayerClass && (gradientOpacity ?? 0) > 0 ? (
+        <div
+          className={`${styles.mediaGradientLayer} ${gradientLayerClass}`}
+          style={{ opacity: gradientOpacity }}
+          aria-hidden
         />
       ) : null}
       <div
@@ -412,14 +424,13 @@ function TournamentSlideCardPreview({
           onRepImageLoad={onRepImageLoad}
           isImageCaptureMode={isImageCaptureMode}
           forceHeroImageCrossOrigin={forceHeroImageCrossOrigin}
+          gradientLayerClass={gradientLayerClass || undefined}
+          gradientOpacity={gradientOpacity}
         >
           {mainSlideAd ? (
             <div className={styles.adCardMediaFill} aria-hidden />
           ) : (
             <div className={styles.classicInner}>
-              {gradientLayerClass && gradientOpacity > 0 ? (
-                <div className={`${styles.mediaGradientLayer} ${gradientLayerClass}`} style={{ opacity: gradientOpacity }} />
-              ) : null}
               <div className={styles.classicTop}>
                 <div className={styles.classicMain}>
                   {showLeadBlock ? (
@@ -494,14 +505,13 @@ function TournamentSlideCardPreview({
           onRepImageLoad={onRepImageLoad}
           isImageCaptureMode={isImageCaptureMode}
           forceHeroImageCrossOrigin={forceHeroImageCrossOrigin}
+          gradientLayerClass={gradientLayerClass || undefined}
+          gradientOpacity={gradientOpacity}
         >
           {mainSlideAd ? (
             <div className={styles.adCardMediaFill} aria-hidden />
           ) : (
             <div className={styles.frameInner}>
-              {gradientLayerClass && gradientOpacity > 0 ? (
-                <div className={`${styles.mediaGradientLayer} ${gradientLayerClass}`} style={{ opacity: gradientOpacity }} />
-              ) : null}
               <div className={styles.frameCenter}>
                 {showLeadBlock ? (
                   <p

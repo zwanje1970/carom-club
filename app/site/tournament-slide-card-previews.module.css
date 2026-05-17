@@ -398,6 +398,8 @@
 }
 
 .classicTop {
+  position: relative;
+  z-index: 1;
   width: 100%;
 }
 
@@ -488,6 +490,8 @@
 }
 
 .frameCenter {
+  position: relative;
+  z-index: 1;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -691,12 +695,12 @@
   pointer-events: none;
   z-index: 0;
   color: transparent;
-  -webkit-text-stroke: 0.6px rgba(0, 0, 0, 0.72);
+  -webkit-text-stroke: 0.8px rgba(0, 0, 0, 0.78);
   text-shadow:
-    -1px -1px 0 rgba(0, 0, 0, 0.52),
-    1px -1px 0 rgba(0, 0, 0, 0.52),
-    -1px 1px 0 rgba(0, 0, 0, 0.52),
-    1px 1px 0 rgba(0, 0, 0, 0.52);
+    -1.25px -1.25px 0 rgba(0, 0, 0, 0.55),
+    1.25px -1.25px 0 rgba(0, 0, 0, 0.55),
+    -1.25px 1.25px 0 rgba(0, 0, 0, 0.55),
+    1.25px 1.25px 0 rgba(0, 0, 0, 0.55);
 }
 
 .titleLayerFill {
@@ -707,29 +711,29 @@
 .cardTitleEffectShadowOutline .titleLayerStroke {
   text-shadow:
     0 2px 6px rgba(0, 0, 0, 0.5),
-    -1px -1px 0 rgba(0, 0, 0, 0.52),
-    1px -1px 0 rgba(0, 0, 0, 0.52),
-    -1px 1px 0 rgba(0, 0, 0, 0.52),
-    1px 1px 0 rgba(0, 0, 0, 0.52);
+    -1.25px -1.25px 0 rgba(0, 0, 0, 0.55),
+    1.25px -1.25px 0 rgba(0, 0, 0, 0.55),
+    -1.25px 1.25px 0 rgba(0, 0, 0, 0.55),
+    1.25px 1.25px 0 rgba(0, 0, 0, 0.55);
 }
 
 .cardTitleEffectOutlineWhite .titleLayerStroke {
-  -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.85);
+  -webkit-text-stroke: 0.8px rgba(255, 255, 255, 0.88);
   text-shadow:
-    -1px -1px 0 rgba(255, 255, 255, 0.6),
-    1px -1px 0 rgba(255, 255, 255, 0.6),
-    -1px 1px 0 rgba(255, 255, 255, 0.6),
-    1px 1px 0 rgba(255, 255, 255, 0.6);
+    -1.25px -1.25px 0 rgba(255, 255, 255, 0.62),
+    1.25px -1.25px 0 rgba(255, 255, 255, 0.62),
+    -1.25px 1.25px 0 rgba(255, 255, 255, 0.62),
+    1.25px 1.25px 0 rgba(255, 255, 255, 0.62);
 }
 
 .cardTitleEffectShadowOutlineWhite .titleLayerStroke {
-  -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.85);
+  -webkit-text-stroke: 0.8px rgba(255, 255, 255, 0.88);
   text-shadow:
     0 2px 6px rgba(0, 0, 0, 0.5),
-    -1px -1px 0 rgba(255, 255, 255, 0.6),
-    1px -1px 0 rgba(255, 255, 255, 0.6),
-    -1px 1px 0 rgba(255, 255, 255, 0.6),
-    1px 1px 0 rgba(255, 255, 255, 0.6);
+    -1.25px -1.25px 0 rgba(255, 255, 255, 0.62),
+    1.25px -1.25px 0 rgba(255, 255, 255, 0.62),
+    -1.25px 1.25px 0 rgba(255, 255, 255, 0.62),
+    1.25px 1.25px 0 rgba(255, 255, 255, 0.62);
 }
 
 .cardRootTemplateLayout .classicDesc,

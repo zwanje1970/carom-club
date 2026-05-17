@@ -916,22 +916,10 @@ export default function ClientTournamentCardPublishV2Page() {
       <div className={editorStyles.pcPageShell}>
         <div className={editorStyles.pcPageMain}>
           <div className={editorStyles.previewSection}>
-            <div className={editorStyles.previewInner}>
-              <div className={editorStyles.previewSlideLayer}>
-                <div className={editorStyles.previewCardScaleHost}>
-                  <div
-                    className={`${editorStyles.previewCardAspectFace} ${editorStyles.previewCardAspectFaceScaledPreview}`}
-                  >
-                    <div className={editorStyles.previewCardScaleClip}>
-                      <div className={editorStyles.previewCardScaleInner} data-card-publish-scale-inner="1">
-                        <div
-                          className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}
-                        >
-                          <CardPublishPreview ref={cardPublishPreviewCaptureRef} model={previewModel} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+            <div className={editorStyles.previewSlideLayer}>
+              <div className={editorStyles.previewCardAspectFace}>
+                <div className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}>
+                  <CardPublishPreview ref={cardPublishPreviewCaptureRef} model={previewModel} />
                 </div>
               </div>
             </div>

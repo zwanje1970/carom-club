@@ -62,13 +62,8 @@
   box-sizing: border-box;
   padding: 0;
   margin: 0;
-  background: var(--ui-bg-page, #f8fafc);
+  background: transparent;
   border-bottom: none;
-}
-
-.previewSection .previewSlideLayer {
-  padding: 24px 14px;
-  background: var(--ui-bg-page, #f8fafc);
 }
 
 /* 게시 v2 미리보기·메인 스크롤 대회 카드 공통 — `.pageWrapV2` 하위 선택자 대신 클래스로 동일 외곽 재사용 */
@@ -107,21 +102,25 @@
  * 하단 흰 띠(분리형 footer)가 overflow:hidden 에 잘리는 경우 방지 — 메인 슬라이드 미사용 경로만.
  */
 .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   flex-shrink: 0;
-  min-height: 180px;
-  width: min(100%, 440px);
+  min-height: 0;
+  width: 100%;
   max-width: 100%;
-  align-self: center;
+  align-self: stretch;
 }
 
 .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] > :global(article) {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   flex-shrink: 0;
-  align-self: center;
+  align-self: stretch;
   min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: auto;
   border-radius: 12px;
   overflow: hidden;
+  box-shadow: none;
 }
 
 /** 미리보기와 동일 규격으로만 DOM 유지 — 화면 밖(html2canvas 전용, 미리보기 레이아웃 불변) */
@@ -171,8 +170,7 @@
 }
 
 /**
- * 메인 슬라이드 실제 카드 영역과 동일 규격 (app/globals.css `.slide-deck__layer` + `.slide-deck__card`).
- * --slide-card-max-width 는 홈 슬라이드 스택에서 정의되며, 없으면 440px.
+ * 메인 세로 스크롤 카드 영역과 동일 — `.slideViewportSiteMain` 배경 + `.slide-deck__layer` 패딩.
  */
 .previewSlideLayer {
   box-sizing: border-box;
@@ -181,22 +179,11 @@
   align-items: center;
   justify-content: center;
   padding: 24px 14px;
-}
-
-/* 미리보기 카드 폭 정렬 — 메인과 동일 440:180 면은 .previewCardAspectFace */
-.previewCardScaleHost {
-  width: 100%;
-  max-width: min(100%, var(--slide-card-max-width, 440px));
-  margin: 0 auto;
-  box-sizing: border-box;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  background-color: rgba(191, 219, 254, 0.5);
 }
 
 /**
- * /site 메인 `.sampleMainCardFaceTournamentDeck` 과 동일 비율(440:180).
- * 오프스크린 캡처·구버전 미리보기: 면 박스만 비율 고정.
+ * /site 메인 `.sampleMainCardFaceTournamentDeck` 과 동일 비율(440:180)·둥근 모서리.
  */
 .previewCardAspectFace {
   box-sizing: border-box;
@@ -204,72 +191,13 @@
   max-width: min(100%, var(--slide-card-max-width, 440px));
   margin-left: auto;
   margin-right: auto;
+  height: auto;
   aspect-ratio: 440 / 180;
-  /* 메인 `.sampleMainCardFaceTournamentDeck` 의 min-height 토큰과 동일 식(폭 상한 440px) */
   min-height: calc(min(100%, var(--slide-card-max-width, 440px)) * 180 / 440);
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-}
-
-/*
- * 화면 미리보기(card-publish-v2): 내부는 항상 440×180 고정 DOM — 좁은 폭에서는 통째로 scale.
- * 줄바꿈·ellipsis·분리형 footer는 캡처 PNG와 동일해야 함.
- */
-.previewCardAspectFace.previewCardAspectFaceScaledPreview {
-  container-type: inline-size;
-  container-name: card-publish-v2-preview;
-  aspect-ratio: unset;
-  min-height: unset;
-  width: 100%;
-  max-width: min(100%, var(--slide-card-max-width, 440px));
-  height: auto;
-  display: block;
-}
-
-.previewCardScaleClip {
-  width: min(100cqw, 440px);
-  height: calc(min(100cqw, 440px) * 180 / 440);
-  overflow: hidden;
-  margin: 0;
-  box-sizing: border-box;
-  position: relative;
-  flex: 0 0 auto;
-  line-height: 0;
-}
-
-.previewCardScaleInner {
-  width: 440px;
-  height: 180px;
-  transform-origin: top left;
-  transform: scale(calc(min(100cqw, 440px) / 440px));
-  box-sizing: border-box;
-}
-
-.previewCardScaleInner .previewCardWrap.previewCardWrapV2Chrome {
-  width: 440px;
-  height: 180px;
-  max-width: none;
-  flex: none;
-  min-height: 0;
-}
-
-.previewCardScaleInner .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] {
-  width: 440px;
-  max-width: 440px;
-  height: 180px;
-  flex: 0 0 auto;
-  align-self: stretch;
-}
-
-.previewCardScaleInner .cardPublishCaptureRootFlexFill[data-card-publish-artboard="1"] > :global(article) {
-  flex: 0 0 auto;
-  flex-shrink: 0;
-  align-self: stretch;
-  min-width: 440px;
-  width: 440px;
-  height: 180px;
-  border-radius: 12px;
   overflow: hidden;
 }
 
@@ -278,14 +206,17 @@
   min-height: 0;
   width: 100%;
   max-width: none;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  border-radius: inherit;
 }
 
 .previewCardAspectFace > .previewCardWrap.previewCardWrapV2Chrome {
   flex: 1 1 auto;
   flex-shrink: 0;
   min-height: 100%;
+  border: none;
 }
 
 .previewCardWrap {
@@ -840,11 +771,15 @@
     top: auto;
     z-index: 1;
     flex-shrink: 0;
-    padding-top: 4px;
-    padding-bottom: 8px;
+    padding: 0;
     margin: 0;
-    background: var(--ui-bg-page, #fafafa);
+    background: transparent;
     border-bottom: 1px solid #e4e4e7;
+  }
+
+  :global(main[data-card-publish-v2="1"]) .previewSlideLayer {
+    padding-top: 20px;
+    padding-bottom: 20px;
   }
 
   :global(main[data-card-publish-v2="1"]) .formPanel {
