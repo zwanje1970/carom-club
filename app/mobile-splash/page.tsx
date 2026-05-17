@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { runMobileSplashWarmup } from "../../lib/client/mobile-splash-warmup";
+import { markMainPreloadAppStart } from "../../lib/site/main-card-image-preload-diag";
 import { isMainSiteLoadDiagEnabled, logMainSiteLoadDiag } from "../../lib/site/main-site-load-diag";
 
 export default function MobileSplashPage() {
@@ -11,6 +12,7 @@ export default function MobileSplashPage() {
   useEffect(() => {
     let cancelled = false;
     const mountAt = performance.now();
+    markMainPreloadAppStart();
     if (isMainSiteLoadDiagEnabled()) {
       logMainSiteLoadDiag("splash", "mounted", { mountAt });
     }

@@ -6,6 +6,11 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
 import deckShellStyles from "./main-site-scroll-tournament-deck-shell.module.css";
+import {
+  getMainPreloadElapsedMs,
+  isMainScrollDeckImageVisible,
+  logMainCardImage,
+} from "../../lib/site/main-card-image-preload-diag";
 import { isMainSiteLoadDiagEnabled, logMainSiteLoadDiag } from "../../lib/site/main-site-load-diag";
 
 function logMainCardReturnDiag(payload: Record<string, unknown>) {
@@ -71,6 +76,37 @@ function scheduleKickVisibleMainScrollDeckImages(viewport: HTMLElement) {
 const SITE_SCROLL_CARD = "data-site-scroll-card";
 const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
 
+/** segment a+b 합산 DOM 상한 — WebView 메모리·이미지 부담 완화 */
+export const MAX_RENDERED_SCROLL_ITEMS = 48;
+
+function logMainScrollRenderCountLimit(payload: {
+  sourceCount: number;
+  generatedCount: number;
+  finalRenderedCount: number;
+}): void {
+  if (!isMainSiteLoadDiagEnabled()) return;
+  console.info(
+    "[main-scroll]",
+    "phase=render-count-limit",
+    `sourceCount=${payload.sourceCount}`,
+    `generatedCount=${payload.generatedCount}`,
+    `finalRenderedCount=${payload.finalRenderedCount}`,
+    `maxAllowed=${MAX_RENDERED_SCROLL_ITEMS}`,
+  );
+}
+
+/** 무한 슬라이드 segment a/b 렌더용 — 원본 순서 유지, 총 DOM 수 상한 적용 */
+function buildMarqueeRenderItems(sourceItems: MainSiteScrollCardItem[]): MainSiteScrollCardItem[] {
+  const sourceCount = sourceItems.length;
+  if (sourceCount === 0) return [];
+  const perSegment = Math.min(sourceCount, MAX_RENDERED_SCROLL_ITEMS / 2);
+  const renderItems = sourceItems.slice(0, perSegment);
+  const generatedCount = sourceCount * 2;
+  const finalRenderedCount = renderItems.length * 2;
+  logMainScrollRenderCountLimit({ sourceCount, generatedCount, finalRenderedCount });
+  return renderItems;
+}
+
 /** 메인 이탈 후 복귀 시 세로 스크롤 위치 복원 — 새 세션·덱 변경 시 무시 */
 const MAIN_SITE_SCROLL_STORAGE_KEY = "site-main-marquee-scroll-v1";
 /** 카드 선택 후 무동작 시 자동 선택취소 */
@@ -129,6 +165,67 @@ function cardSlotClassNames(base: string, selected: boolean, selectedMod?: strin
   return [base, selected && selectedMod, selected && "card-selected"].filter(Boolean).join(" ");
 }
 
+function useMainScrollDeckImageDiag(itemId: string, imageUrl: string) {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const srcAssignedRef = useRef(false);
+  const loadLoggedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!imageUrl.trim() || srcAssignedRef.current || !isMainSiteLoadDiagEnabled()) return;
+    srcAssignedRef.current = true;
+    logMainCardImage("main-src-assigned", {
+      id: itemId,
+      url: imageUrl,
+      elapsedMs: getMainPreloadElapsedMs(),
+    });
+  }, [itemId, imageUrl]);
+
+  const logLoadedDecodedVisible = useCallback(() => {
+    if (!isMainSiteLoadDiagEnabled() || loadLoggedRef.current) return;
+    loadLoggedRef.current = true;
+    const url = imageUrl.trim();
+    logMainCardImage("main-img-loaded", {
+      id: itemId,
+      url,
+      elapsedMs: getMainPreloadElapsedMs(),
+    });
+    const img = imgRef.current;
+    if (!img) return;
+    const afterDecode = () => {
+      logMainCardImage("main-img-decoded", {
+        id: itemId,
+        url,
+        elapsedMs: getMainPreloadElapsedMs(),
+      });
+      requestAnimationFrame(() => {
+        const node = imgRef.current;
+        if (node && isMainScrollDeckImageVisible(node)) {
+          logMainCardImage("main-img-visible", {
+            id: itemId,
+            url,
+            elapsedMs: getMainPreloadElapsedMs(),
+          });
+        }
+      });
+    };
+    if (typeof img.decode === "function") {
+      void img.decode().then(afterDecode).catch(afterDecode);
+    } else {
+      afterDecode();
+    }
+  }, [itemId, imageUrl]);
+
+  useLayoutEffect(() => {
+    const img = imgRef.current;
+    if (!img || !imageUrl.trim() || !isMainSiteLoadDiagEnabled()) return;
+    if (img.complete && img.naturalWidth > 0) {
+      logLoadedDecodedVisible();
+    }
+  }, [imageUrl, logLoadedDecodedVisible]);
+
+  return { imgRef, onDiagLoad: logLoadedDecodedVisible };
+}
+
 const MainSiteCardRow = memo(function MainSiteCardRow({
   rowKey: _rowKey,
   item,
@@ -153,6 +250,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   const deckImgUrl = item.imageUrl?.trim() ?? "";
   /** PNG 면: URL 있으면 placeholder 플래그와 무관하게 실제 이미지 카드 */
   const renderAsPngDeck = Boolean(deckImgUrl);
+  const { imgRef, onDiagLoad } = useMainScrollDeckImageDiag(item.id, deckImgUrl);
 
   const slotShellProps = {
     className: cardSlotClassNames(styles.sampleMainCardSlot, selected, styles.sampleMainCardSlotSelected),
@@ -222,6 +320,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                     >
                       <div className={styles.sampleMainCardPublishedInner}>
                         <img
+                          ref={imgRef}
                           src={deckImgUrl}
                           alt=""
                           className={styles.sampleMainCardPosterPublishedSnapshot}
@@ -233,12 +332,13 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                             : prioritizeNearViewportImage
                               ? { fetchPriority: "auto" as const }
                               : {})}
-                          {...(lcpHeroImage
-                            ? {
-                                onLoad: () => onLcpHeroImageLoad?.(),
-                                onError: () => onLcpHeroImageError?.(),
-                              }
-                            : {})}
+                          onLoad={() => {
+                            onDiagLoad();
+                            if (lcpHeroImage) onLcpHeroImageLoad?.();
+                          }}
+                          onError={() => {
+                            if (lcpHeroImage) onLcpHeroImageError?.();
+                          }}
                         />
                         {item.slideDeckPngAdMark ? (
                           <span className={siteStyles.slideDeckPngAdMark} aria-hidden>
@@ -300,6 +400,7 @@ export type MainSiteScrollCardsProps = {
 };
 
 export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSiteScrollCardsProps) {
+  const renderItems = useMemo(() => buildMarqueeRenderItems(items), [items]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [autoSlideReady, setAutoSlideReady] = useState(false);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -321,23 +422,25 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const scrollPixelCarryRef = useRef(0);
 
   const lcpHeroItemIndex = useMemo(
-    () => items.findIndex((x) => Boolean(x.imageUrl?.trim())),
-    [items],
+    () => renderItems.findIndex((x) => Boolean(x.imageUrl?.trim())),
+    [renderItems],
   );
   const initialPriorityIndexes = useMemo(() => {
     const out: number[] = [];
-    for (let i = 0; i < items.length; i++) {
-      if (!Boolean(items[i]?.imageUrl?.trim())) continue;
+    for (let i = 0; i < renderItems.length; i++) {
+      if (!Boolean(renderItems[i]?.imageUrl?.trim())) continue;
       out.push(i);
       if (out.length >= 3) break;
     }
     return out;
-  }, [items]);
+  }, [renderItems]);
 
   const itemsIdsKey = items.length > 0 ? mainScrollIdsKey(items) : "";
 
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  const renderItemsRef = useRef(renderItems);
+  renderItemsRef.current = renderItems;
 
   useEffect(() => {
     const path = typeof window !== "undefined" ? window.location.pathname : "";
@@ -413,6 +516,18 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       firstCardId: first?.id ?? null,
     });
   }, [items, lcpHeroItemIndex]);
+
+  useEffect(() => {
+    if (!isMainSiteLoadDiagEnabled() || renderItems.length === 0) return;
+    const withImageCount = renderItems.filter((it) => Boolean(it.imageUrl?.trim())).length;
+    const eagerIndexes = new Set(initialPriorityIndexes);
+    if (lcpHeroItemIndex >= 0) eagerIndexes.add(lcpHeroItemIndex);
+    logMainCardImage("load-target-count", {
+      visibleOrNearCount: eagerIndexes.size,
+      totalRenderedCount: withImageCount * 2,
+      totalDeckItems: items.length,
+    });
+  }, [items.length, renderItems, initialPriorityIndexes, lcpHeroItemIndex]);
 
   const onLcpHeroImageLoad = useCallback(() => {
     if (!isMainSiteLoadDiagEnabled() || lcpHeroLoadLoggedRef.current) return;
@@ -721,7 +836,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       if (!start) return 0;
       let total = 0;
       let el: Element | null = start;
-      for (let i = 0; i < itemsRef.current.length && el; i++) {
+      for (let i = 0; i < renderItemsRef.current.length && el; i++) {
         if (!(el instanceof HTMLElement)) break;
         total += el.offsetHeight;
         el = el.nextElementSibling;
@@ -938,7 +1053,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       className={`${styles.sampleMainMarqueeSegment} ${siteStyles.segmentMarqueeContents}`}
       key={segmentKey}
     >
-      {items.map((item, itemIndex) => {
+      {renderItems.map((item, itemIndex) => {
         const rowKey = `${segmentKey}-${item.id}`;
         const lcpHeroImage =
           segmentKey === "a" && itemIndex === lcpHeroItemIndex && lcpHeroItemIndex >= 0;
