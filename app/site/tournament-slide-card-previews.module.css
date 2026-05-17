@@ -253,7 +253,7 @@
   justify-content: space-between;
   gap: calc(10px * var(--tournament-card-height-scale));
   padding: 0 calc(12px * var(--tournament-card-height-scale));
-  background: #fff;
+  background: transparent;
 }
 
 .cardFooterBackground {

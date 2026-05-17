@@ -87,6 +87,7 @@ const CardPublishPreviewInner = forwardRef<
         slideDeck
         slideDeckAspectFill
         templateCardLayout
+        editorPreviewFixedLayout
         suppressLink
         repImageHighPriority={Boolean(model.slideImage320Url?.trim())}
         slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}

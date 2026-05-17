@@ -64,6 +64,7 @@
   margin: 0;
   background: transparent;
   border-bottom: none;
+  grid-column: 1 / -1;
 }
 
 /* 게시 v2 미리보기·메인 스크롤 대회 카드 공통 — `.pageWrapV2` 하위 선택자 대신 클래스로 동일 외곽 재사용 */
@@ -708,6 +709,12 @@
     display: block;
     min-width: 0;
     box-sizing: border-box;
+  }
+
+  .pcPageMain > .previewSection {
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    width: 100vw;
   }
 }
 

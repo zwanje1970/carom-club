@@ -361,6 +361,7 @@ export default function ClientTournamentCardPublishV2Page() {
     backgroundType,
     themeType,
     v2MediaMode,
+    imageOverlayOpacity,
     mediaBackground,
   ]);
 
