@@ -1014,9 +1014,10 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       const rawDeltaTotal = pxPerSec * rawDtSec + carryBefore;
       /** transform 검증: RAF dtSec 변동 대신 고정 프레임 간격으로 이동량 계산 */
       const fixedFrameSec = 1 / 60;
-      const fixedDeltaTotal = pxPerSec * fixedFrameSec + carryBefore;
-      const deltaTotal = useTransformDiag ? fixedDeltaTotal : rawDeltaTotal;
-      scrollPixelCarryRef.current = deltaTotal % 1;
+      const fixedMove = pxPerSec / 60;
+      const fixedDeltaTotal = useTransformDiag ? fixedMove : pxPerSec * fixedFrameSec + carryBefore;
+      const deltaTotal = useTransformDiag ? fixedMove : rawDeltaTotal;
+      scrollPixelCarryRef.current = useTransformDiag ? 0 : deltaTotal % 1;
       const currentScrollValue = useTransformDiag ? mainScrollVirtualOffsetRef.current : node.scrollTop;
       let nextScrollTop = currentScrollValue + deltaTotal;
       let wrapSubtractions = 0;
@@ -1106,6 +1107,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
                   fixedFrameSec,
                   rawDeltaTotal,
                   fixedDeltaTotal,
+                  carryDisabled: true,
                 }
               : {}),
           },
