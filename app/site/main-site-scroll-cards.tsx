@@ -26,10 +26,31 @@ function isMainScrollUseTransformDiagEnabled(): boolean {
   return process.env.NEXT_PUBLIC_MAIN_SCROLL_USE_TRANSFORM_DIAG === "1";
 }
 
-function applyMainScrollTrackTransformDiag(track: HTMLElement | null, offsetPx: number): void {
+/** transform 진단 전용 — 정수 transform vs 소수 transformOffset 비교 */
+function isMainScrollRoundTransformDiagEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_MAIN_SCROLL_ROUND_TRANSFORM_DIAG === "1";
+}
+
+function resolveMainScrollTransformCssOffset(virtualOffsetPx: number): {
+  transformOffset: number;
+  transformRoundedOffset: number;
+  useRoundedTransform: boolean;
+  appliedTransformOffset: number;
+} {
+  const transformOffset = Number(virtualOffsetPx.toFixed(3));
+  const transformRoundedOffset = Math.round(virtualOffsetPx);
+  const useRoundedTransform = isMainScrollRoundTransformDiagEnabled();
+  const appliedTransformOffset = useRoundedTransform ? transformRoundedOffset : transformOffset;
+  return { transformOffset, transformRoundedOffset, useRoundedTransform, appliedTransformOffset };
+}
+
+function applyMainScrollTrackTransformDiag(track: HTMLElement | null, appliedTransformOffsetPx: number): void {
   if (!track) return;
-  const transformOffset = Number(offsetPx.toFixed(3));
-  track.style.setProperty("transform", `translate3d(0, ${-transformOffset}px, 0)`, "important");
+  track.style.setProperty(
+    "transform",
+    `translate3d(0, ${-appliedTransformOffsetPx}px, 0)`,
+    "important",
+  );
   track.style.setProperty("will-change", "transform", "important");
 }
 
@@ -688,7 +709,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       if (isMainScrollUseTransformDiagEnabled()) {
         mainScrollVirtualOffsetRef.current = nextTop;
         viewport.scrollTop = 0;
-        applyMainScrollTrackTransformDiag(trackRef.current, nextTop);
+        const transformCss = resolveMainScrollTransformCssOffset(nextTop);
+        applyMainScrollTrackTransformDiag(trackRef.current, transformCss.appliedTransformOffset);
       } else {
         viewport.scrollTop = nextTop;
       }
@@ -1060,6 +1082,9 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         if (cardTop !== null) mainShakePrevCardTopRef.current = cardTop;
         const hasFractionalTransform =
           transformValue !== "none" && /\.[0-9]+/.test(transformValue);
+        const transformCss = useTransformDiag
+          ? resolveMainScrollTransformCssOffset(appliedScrollTop)
+          : null;
 
         maybeLogMainScrollShakeFrame({
           frameTime,
@@ -1074,8 +1099,10 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             deltaTopFromPrevFrame,
             hasFractionalTransform,
             scrollApplyMode: useTransformDiag ? "transform" : "scrollTop",
-            transformRoundedOffset: useTransformDiag ? Math.round(appliedScrollTop) : null,
-            transformOffset: useTransformDiag ? Number(appliedScrollTop.toFixed(3)) : null,
+            transformRoundedOffset: transformCss?.transformRoundedOffset ?? null,
+            transformOffset: transformCss?.transformOffset ?? null,
+            appliedTransformOffset: transformCss?.appliedTransformOffset ?? null,
+            useRoundedTransform: transformCss?.useRoundedTransform ?? null,
             ...(useTransformDiag
               ? {
                   scrollMotionTimingMode: "dt-based",
@@ -1096,7 +1123,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       programmaticScrollUntilMsRef.current = performance.now() + 160;
       if (useTransformDiag) {
         mainScrollVirtualOffsetRef.current = appliedScrollTop;
-        applyMainScrollTrackTransformDiag(trackRef.current, appliedScrollTop);
+        const transformCss = resolveMainScrollTransformCssOffset(appliedScrollTop);
+        applyMainScrollTrackTransformDiag(trackRef.current, transformCss.appliedTransformOffset);
       } else {
         node.scrollTop = appliedScrollTop;
       }
@@ -1116,7 +1144,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
           mainScrollVirtualOffsetRef.current = node.scrollTop;
           node.scrollTop = 0;
         }
-        applyMainScrollTrackTransformDiag(trackRef.current, mainScrollVirtualOffsetRef.current);
+        const transformCss = resolveMainScrollTransformCssOffset(mainScrollVirtualOffsetRef.current);
+        applyMainScrollTrackTransformDiag(trackRef.current, transformCss.appliedTransformOffset);
       }
       if (isMainScrollShakeDiagEnabled()) {
         mainShakeRafStartedAtRef.current = performance.now();

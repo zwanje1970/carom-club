@@ -30,6 +30,8 @@ const MAIN_SHAKE_DIAG_COMPACT_KEYS = [
   "deltaTopFromPrevFrame",
   "transformOffset",
   "transformRoundedOffset",
+  "appliedTransformOffset",
+  "useRoundedTransform",
   "hasFractionalTransform",
   "isWrapped",
   "wrapSubtractions",
