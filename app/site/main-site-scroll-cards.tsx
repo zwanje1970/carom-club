@@ -1045,23 +1045,11 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
           trackEl && typeof getComputedStyle !== "undefined" ? getComputedStyle(trackEl).transform : "(none)";
         const cardEl = primarySegmentRef.current?.querySelector(`[${SITE_SCROLL_CARD}]`) as HTMLElement | null;
         const rect = cardEl?.getBoundingClientRect();
-        const imgEl = primarySegmentRef.current?.querySelector(
-          "img[data-site-scroll-deck-img]",
-        ) as HTMLImageElement | null;
         const cardTop = rect ? rect.top : null;
-        const cardLeft = rect ? rect.left : null;
-        const cardWidth = rect?.width ?? null;
-        const cardHeight = rect?.height ?? null;
         const prevTop = mainShakePrevCardTopRef.current;
-        const prevLeft = mainShakePrevCardLeftRef.current;
         const deltaTopFromPrevFrame =
           prevTop !== null && cardTop !== null ? cardTop - prevTop : null;
-        const deltaLeftFromPrevFrame =
-          prevLeft !== null && cardLeft !== null ? cardLeft - prevLeft : null;
         if (cardTop !== null) mainShakePrevCardTopRef.current = cardTop;
-        if (cardLeft !== null) mainShakePrevCardLeftRef.current = cardLeft;
-        const hasFractionalTop =
-          cardTop !== null ? Math.abs(cardTop - Math.round(cardTop)) > 0.012 : null;
         const hasFractionalTransform =
           transformValue !== "none" && /\.[0-9]+/.test(transformValue);
 
@@ -1072,31 +1060,11 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             currentScrollValue,
             nextScrollValue: nextScrollTop,
             appliedMoveValue,
-            transformValue,
-            segmentHeight,
-            loopDistance,
             isWrapped,
             wrapSubtractions,
-            lowBranchApplied,
             cardTop,
-            cardLeft,
-            cardWidth,
-            cardHeight,
             deltaTopFromPrevFrame,
-            deltaLeftFromPrevFrame,
-            hasFractionalTop,
             hasFractionalTransform,
-            imageComplete: imgEl ? imgEl.complete : null,
-            imageCurrentSrc: imgEl ? (imgEl.currentSrc || imgEl.src || "").slice(0, 160) : null,
-            rafStartedAt: mainShakeRafStartedAtRef.current,
-            rafRestartCount: mainShakeRafEffectRunCountRef.current,
-            pxPerSec,
-            dtSec: rawDtSec,
-            deltaTotal,
-            carryAfter: scrollPixelCarryRef.current,
-            firstStart,
-            loopEnd,
-            maxScrollTop,
             scrollApplyMode: useTransformDiag ? "transform" : "scrollTop",
             transformRoundedOffset: useTransformDiag ? Math.round(appliedScrollTop) : null,
             transformOffset: useTransformDiag ? Number(appliedScrollTop.toFixed(3)) : null,
@@ -1104,8 +1072,6 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
               ? {
                   scrollMotionTimingMode: "fixed-60fps",
                   rawDtSec,
-                  fixedFrameSec,
-                  rawDeltaTotal,
                   fixedDeltaTotal,
                   carryDisabled: true,
                 }

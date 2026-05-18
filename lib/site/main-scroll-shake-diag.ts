@@ -16,7 +16,40 @@ let sessionLogCount = 0;
 let lastThrottleLogMs = 0;
 
 const THROTTLE_MS = 220;
-const MAX_STORED_LOG_LINES = 120;
+const MAX_STORED_LOG_LINES = 40;
+
+/** 콘솔·복사 버퍼에 남기는 필드만 허용 */
+const MAIN_SHAKE_DIAG_COMPACT_KEYS = [
+  "diagSampleIndex",
+  "diagFrameIndex",
+  "scrollApplyMode",
+  "scrollMotionTimingMode",
+  "currentScrollValue",
+  "nextScrollValue",
+  "appliedMoveValue",
+  "deltaTopFromPrevFrame",
+  "transformOffset",
+  "transformRoundedOffset",
+  "hasFractionalTransform",
+  "isWrapped",
+  "wrapSubtractions",
+  "cardTop",
+  "rawDtSec",
+  "fixedDeltaTotal",
+  "carryDisabled",
+] as const;
+
+export function compactMainScrollShakeDiagPayload(
+  source: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of MAIN_SHAKE_DIAG_COMPACT_KEYS) {
+    if (key in source) {
+      out[key] = source[key];
+    }
+  }
+  return out;
+}
 
 let clipboardFnInstalled = false;
 
@@ -73,11 +106,12 @@ export function resetMainScrollShakeDiagSession(): void {
 export function logMainScrollShakeDiag(payload: Record<string, unknown>): void {
   if (!isMainScrollShakeDiagEnabled()) return;
   sessionLogCount += 1;
-  const serializable = toSerializableLogEntry(payload);
+  const slim = compactMainScrollShakeDiagPayload(payload);
+  const serializable = toSerializableLogEntry(slim);
   if (serializable !== null) {
     appendStoredShakeDiagLog(serializable);
   }
-  console.info("[main-shake-diag]", payload);
+  console.info("[main-shake-diag]", slim);
 }
 
 /** 매 프레임 호출: 래핑·큰 점프·스로틀 시에만 로그 */
@@ -98,8 +132,7 @@ export function maybeLogMainScrollShakeFrame(args: {
   }
   lastThrottleLogMs = now;
   logMainScrollShakeDiag({
-    ...args.payload,
-    frameTime: args.frameTime,
+    ...compactMainScrollShakeDiagPayload(args.payload),
     diagSampleIndex: sessionLogCount,
     diagFrameIndex: sessionFrameCount,
   });
