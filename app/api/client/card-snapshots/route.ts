@@ -27,6 +27,8 @@ const CARD_SNAPSHOTS_EDITOR_LIST_LIMIT = 3;
 /** 게시카드 작성 화면 복원에 필요한 필드만 (`loadSnapshots` 기준) */
 function publishedCardSnapshotToEditorGetBody(s: PublishedCardSnapshot): Record<string, unknown> {
   const out: Record<string, unknown> = {
+    snapshotId: s.snapshotId,
+    updatedAt: s.updatedAt,
     title: s.title,
     cardExtraLine1: s.cardExtraLine1 ?? null,
     cardExtraLine2: s.cardExtraLine2 ?? null,
@@ -42,6 +44,8 @@ function publishedCardSnapshotToEditorGetBody(s: PublishedCardSnapshot): Record<
     cardTitleTextColor: s.cardTitleTextColor ?? null,
     cardDescriptionTextColor: s.cardDescriptionTextColor ?? null,
     cardTitleEffect: s.cardTitleEffect ?? null,
+    cardExtraLine1Effect: s.cardExtraLine1Effect ?? null,
+    cardExtraLine2Effect: s.cardExtraLine2Effect ?? null,
     cardTitleOutlineColor: s.cardTitleOutlineColor ?? null,
     cardBottomBarColor: s.cardBottomBarColor ?? null,
     cardBottomBarOpacity:
@@ -140,6 +144,8 @@ export async function POST(request: Request) {
     cardTitleTextColor?: unknown;
     cardDescriptionTextColor?: unknown;
     cardTitleEffect?: unknown;
+    cardExtraLine1Effect?: unknown;
+    cardExtraLine2Effect?: unknown;
     cardTitleOutlineColor?: unknown;
     cardBottomBarColor?: unknown;
     cardBottomBarOpacity?: unknown;
@@ -229,6 +235,18 @@ export async function POST(request: Request) {
     body.cardTitleEffect === "shadow_outline"
       ? body.cardTitleEffect
       : "none";
+  const cardExtraLine1Effect =
+    body.cardExtraLine1Effect === "shadow" ||
+    body.cardExtraLine1Effect === "outline" ||
+    body.cardExtraLine1Effect === "shadow_outline"
+      ? body.cardExtraLine1Effect
+      : "none";
+  const cardExtraLine2Effect =
+    body.cardExtraLine2Effect === "shadow" ||
+    body.cardExtraLine2Effect === "outline" ||
+    body.cardExtraLine2Effect === "shadow_outline"
+      ? body.cardExtraLine2Effect
+      : "none";
   const cardTitleOutlineColor = body.cardTitleOutlineColor === "white" ? "white" : "black";
   const cardBottomBarColor =
     body.cardBottomBarColor === null
@@ -304,6 +322,8 @@ export async function POST(request: Request) {
       ...(cardTitleTextColor !== undefined ? { cardTitleTextColor } : {}),
       ...(cardDescriptionTextColor !== undefined ? { cardDescriptionTextColor } : {}),
       ...(cardTitleEffect !== undefined ? { cardTitleEffect } : {}),
+      ...(cardExtraLine1Effect !== undefined ? { cardExtraLine1Effect } : {}),
+      ...(cardExtraLine2Effect !== undefined ? { cardExtraLine2Effect } : {}),
       ...(cardTitleOutlineColor !== undefined ? { cardTitleOutlineColor } : {}),
       ...(cardBottomBarColor !== undefined ? { cardBottomBarColor } : {}),
       ...(cardBottomBarOpacity !== undefined ? { cardBottomBarOpacity } : {}),

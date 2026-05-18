@@ -515,6 +515,9 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         </button>
       ) : null}
       <div className="client-tournament-manage__applicationsHeaderZone">
+        {!fullscreenTable ? (
+          <p className="client-tournament-manage__applicationsScreenName">신청자 관리</p>
+        ) : null}
         {fullscreenTable ? (
           <div className="client-tournament-manage__fullscreenTableHead">
             <button

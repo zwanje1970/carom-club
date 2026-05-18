@@ -8,6 +8,10 @@ import ParticipantApplicationDetailModal from "./ParticipantApplicationDetailMod
 import ParticipantProcessingConfirmModal, {
   type ParticipantProcessingConfirmKind,
 } from "./ParticipantProcessingConfirmModal";
+import {
+  DEPOSIT_UNCONFIRM_REQUIRES_APPROVAL_REVOKED_FIRST,
+  isProcessingApplicationApproved,
+} from "../../../../../lib/tournament-application-processing-guards";
 import type { TournamentApplicationListItem } from "../../../../../lib/types/entities";
 
 function isParticipantDeleteAlreadyGone(status: number, error?: string): boolean {
@@ -322,6 +326,10 @@ export default function ParticipantListRow({
       runDepositConfirmOptimistic();
       return;
     }
+    if (isProcessingApplicationApproved(clientApplicationApprovedAt)) {
+      window.alert(DEPOSIT_UNCONFIRM_REQUIRES_APPROVAL_REVOKED_FIRST);
+      return;
+    }
     setConfirmKind("deposit-unconfirm");
   }
 
@@ -411,8 +419,7 @@ export default function ParticipantListRow({
   function applyOptimisticConfirm(kind: ParticipantProcessingConfirmKind) {
     if (kind === "deposit-unconfirm") {
       setClientDepositConfirmedAt(null);
-      setClientApplicationApprovedAt(null);
-      onProcessingUpdated?.({ clientDepositConfirmedAt: null, clientApplicationApprovedAt: null });
+      onProcessingUpdated?.({ clientDepositConfirmedAt: null });
       return;
     }
     if (kind === "approval-unconfirm") {

@@ -9,6 +9,7 @@ import {
   findBracketMatchLocation as findBracketMatchLocationForSync,
   getSliceRoundsFromBracket as getSliceRoundsForWinnerSync,
   hasDownstreamRoundsInSlice as hasDownstreamRoundsInSliceForWinnerSync,
+  isEligibleBracketWinnerUserId,
   syncClearMatchWinner,
   syncRenamePlayer,
   syncSwapPlayers,
@@ -39,6 +40,7 @@ import TournamentTvLinkBlock from "../TournamentTvLinkBlock";
 import "../tournament-manage-ui.css";
 import { fetchClientBracketMetaJson } from "./bracket-client-poll-meta";
 import { getShuffleRoundBlockedReason } from "../../../../../lib/bracket-shuffle-guards";
+import { bracketSlotDisplayName } from "../../../../../lib/bracket-player-slot";
 
 const TournamentGroupRound1PrintClient = dynamic(
   () => import("./TournamentGroupRound1PrintClient"),
@@ -485,9 +487,8 @@ function multiBlockBlockButtonLabel(bl: { id: string; label?: string }): string 
   return `조 ${bl.id}`;
 }
 
-function bracketSlotLabel(p: { name: string; displayName?: string | null }): string {
-  const d = typeof p.displayName === "string" ? p.displayName.trim() : "";
-  return d || p.name;
+function bracketSlotLabel(p: { userId: string; name: string; displayName?: string | null }): string {
+  return bracketSlotDisplayName(p);
 }
 
 function bracketRoundHasRecordedResult(r: BracketRoundDoc): boolean {
@@ -504,7 +505,16 @@ function quickBracketRoundShuffleBlockedReason(sliceRounds: BracketRoundDoc[], r
   return getShuffleRoundBlockedReason(sliceRounds, round.roundNumber);
 }
 
-/** 빠른 결과: 카드 제목 (참가 규모·조·라운드 기준, 고정 64강 가정 없음) */
+/** 빠른 결과: 다음 라운드 카드는 이전 라운드에서 내려온 실참가자가 1명 이상 있을 때만 표시(빈 슬롯만이면 숨김). */
+function quickResultsRoundHasAnyEligibleParticipant(round: BracketRoundDoc): boolean {
+  for (const m of round.matches) {
+    if (isEligibleBracketWinnerUserId(m.player1.userId)) return true;
+    if (isEligibleBracketWinnerUserId(m.player2.userId)) return true;
+  }
+  return false;
+}
+
+/** 빠른 결과: 카드 제목 (참가 규모·조·라운드 기준, 고정 라운드 수 없음) */
 function quickResultsRoundCardTitle(bracket: Bracket, boardSliceKey: string | null, round: BracketRoundDoc): string {
   const matches = round.matches?.length ?? 0;
   const size = Math.max(2, matches * 2);
@@ -520,7 +530,7 @@ function quickResultsRoundCardTitle(bracket: Bracket, boardSliceKey: string | nu
     const lab = typeof bl?.label === "string" && bl.label.trim() !== "" ? bl.label.trim() : bid;
     return `${size}강-${lab}-${idx}경기`;
   }
-  return `${size}강 ${idx}경기`;
+  return `${size}강-A-${idx}경기`;
 }
 
 /** 조분할 입력값 문자열 → 숫자 (미입력·숫자 아님은 null). 실행 시점 검증용. */
@@ -1015,12 +1025,17 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
   const quickResultsRoundCards = useMemo(() => {
     if (variant !== "quickResults") return [];
-    const sorted = displayRoundsSorted;
+    const sorted = [...displayRounds].sort((a, b) => a.roundNumber - b.roundNumber);
     if (!sorted.length) return [];
-    const firstIncompleteIdx = sorted.findIndex((r) => r.status !== "COMPLETED");
-    const inProgress = firstIncompleteIdx === -1 ? null : sorted[firstIncompleteIdx]!;
+    const minRn = sorted[0]!.roundNumber;
+    const visible = sorted.filter(
+      (r) => r.roundNumber === minRn || quickResultsRoundHasAnyEligibleParticipant(r),
+    );
+    if (!visible.length) return [];
+    const firstIncompleteIdx = visible.findIndex((r) => r.status !== "COMPLETED");
+    const inProgress = firstIncompleteIdx === -1 ? null : visible[firstIncompleteIdx]!;
     const nextCandidate =
-      inProgress && firstIncompleteIdx + 1 < sorted.length ? sorted[firstIncompleteIdx + 1]! : null;
+      inProgress && firstIncompleteIdx + 1 < visible.length ? visible[firstIncompleteIdx + 1]! : null;
     const nextWaiting =
       nextCandidate && nextCandidate.matches.every((m) => m.status === "PENDING") ? nextCandidate : null;
     const topKeys = new Set<number>();
@@ -1033,20 +1048,20 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       cards.push({ round: nextWaiting, role: "next" });
       topKeys.add(nextWaiting.roundNumber);
     }
-    for (const r of sorted) {
+    for (const r of visible) {
       if (r.status === "COMPLETED" && !topKeys.has(r.roundNumber)) {
         cards.push({ round: r, role: "completed" });
         topKeys.add(r.roundNumber);
       }
     }
-    for (const r of sorted) {
+    for (const r of visible) {
       if (!topKeys.has(r.roundNumber)) {
         cards.push({ round: r, role: "inProgress" });
         topKeys.add(r.roundNumber);
       }
     }
     return cards;
-  }, [variant, displayRoundsSorted]);
+  }, [variant, displayRounds]);
 
   useEffect(() => {
     if (variant !== "quickResults") return;
@@ -1129,15 +1144,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     },
     [suggestedAccordionOpen],
   );
-
-  const hubAdvanceTargetRound = useMemo(() => {
-    if (!bracket || displayRoundsSorted.length === 0) return null;
-    const candidates = displayRoundsSorted.filter(
-      (r) => r.status === "COMPLETED" && !displayRounds.some((n) => n.roundNumber === r.roundNumber + 1),
-    );
-    if (!candidates.length) return null;
-    return candidates.reduce((a, b) => (a.roundNumber > b.roundNumber ? a : b));
-  }, [bracket, displayRoundsSorted, displayRounds]);
 
   const quickDetailModalMatch = useMemo(() => {
     if (!quickDetailMatchId) return null;
@@ -1449,7 +1455,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       );
       const result = (await response.json()) as { bracket?: Bracket; error?: string };
       if (!response.ok || !result.bracket) {
-        return { ok: false as const, error: result.error ?? "다음 라운드 생성에 실패했습니다." };
+        return { ok: false as const, error: result.error ?? "대진표를 갱신하지 못했습니다." };
       }
       return { ok: true as const, bracket: result.bracket };
     },
@@ -2125,34 +2131,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     );
   }
 
-  async function handleAdvanceRound(roundNumber: number) {
-    if (!tournamentId || actionLoading) return;
-    if (interactionLocked) {
-      setMessage("종료된 대회는 라운드를 진행할 수 없습니다.");
-      return;
-    }
-    if (!bracket) return;
-    setActionLoading(true);
-    setSaveState("saving");
-    setMessage("");
-    try {
-      const result = await runAdvanceRoundMutation(roundNumber, boardSliceKey);
-      if (!result.ok) {
-        setSaveState("error");
-        setMessage(result.error);
-        return;
-      }
-      setBracket(result.bracket);
-      setSaveState("idle");
-      setMessage("");
-    } catch {
-      setSaveState("error");
-      setMessage("다음 라운드 생성 중 오류가 발생했습니다.");
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
   const runShuffleRoundOneApi = useCallback(
     async (
       roundNumber: number,
@@ -2404,7 +2382,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       return;
     }
     const players = targetRound.matches.flatMap((m) => [m.player1, m.player2]);
-    if (players.some((p) => !p.userId.trim() || p.userId.startsWith("__TBD__:") || p.name.trim().toUpperCase() === "TBD")) {
+    if (players.some((p) => !isEligibleBracketWinnerUserId(p.userId.trim()))) {
       setSaveState("error");
       setMessage("인원이 확정되지 않았습니다.");
       return;
@@ -3550,26 +3528,6 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               </div>
             ) : null}
             {!bracketLooksLikeSplitLayout(bracket) ? <BracketProgressSummaryCard bracket={bracket} /> : null}
-
-            {displayRoundsSorted.length > 0 && hubAdvanceTargetRound ? (
-              <div className="v3-stack" style={{ gap: "0.35rem" }}>
-                <button
-                  type="button"
-                  className="v3-btn"
-                  onClick={() => void handleAdvanceRound(hubAdvanceTargetRound.roundNumber)}
-                  disabled={actionLoading || interactionLocked}
-                  style={{
-                    boxShadow: "none",
-                    fontWeight: 700,
-                    alignSelf: "flex-start",
-                    minHeight: 44,
-                    borderRadius: "8px",
-                  }}
-                >
-                  다음 라운드 생성
-                </button>
-              </div>
-            ) : null}
 
             <div className="v3-stack" style={{ gap: "0.5rem", width: "100%" }}>
               <Link

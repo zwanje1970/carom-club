@@ -703,9 +703,30 @@
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.38) 0%, rgba(15, 23, 42, 0.28) 100%);
 }
 
-.cardTitleEffectShadow .classicTitle:not(.cardTitleWithLayeredOutline),
-.cardTitleEffectShadow .frameTitle:not(.cardTitleWithLayeredOutline) {
+.classicTitle.cardLineEffectShadow:not(.cardTitleWithLayeredOutline),
+.frameTitle.cardLineEffectShadow:not(.cardTitleWithLayeredOutline) {
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.classicLead.cardLineEffectShadow,
+.frameLead.cardLineEffectShadow,
+.classicDesc.cardLineEffectShadow,
+.frameDesc.cardLineEffectShadow {
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.classicLead.cardLineEffectOutline:not(.cardLineEffectOutlineWhite),
+.frameLead.cardLineEffectOutline:not(.cardLineEffectOutlineWhite),
+.classicDesc.cardLineEffectOutline:not(.cardLineEffectOutlineWhite),
+.frameDesc.cardLineEffectOutline:not(.cardLineEffectOutlineWhite) {
+  -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.78);
+}
+
+.classicLead.cardLineEffectOutline.cardLineEffectOutlineWhite,
+.frameLead.cardLineEffectOutline.cardLineEffectOutlineWhite,
+.classicDesc.cardLineEffectOutline.cardLineEffectOutlineWhite,
+.frameDesc.cardLineEffectOutline.cardLineEffectOutlineWhite {
+  -webkit-text-stroke: 0.5px rgba(255, 255, 255, 0.88);
 }
 
 /* 레이어 제목: h3는 레이아웃만, 외곽선·그림자는 stroke 레이어만 */

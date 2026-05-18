@@ -46,8 +46,12 @@ export type SlideDeckItem = {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   cardTextShadowEnabled?: boolean;
-  /** 제목 효과(제목만 적용) */
+  /** 제목 텍스트 효과 */
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  /** 설명1(cardExtraLine1) 텍스트 효과 */
+  cardExtraLine1Effect?: "none" | "shadow" | "outline" | "shadow_outline";
+  /** 설명2(cardExtraLine2) 텍스트 효과 */
+  cardExtraLine2Effect?: "none" | "shadow" | "outline" | "shadow_outline";
   cardTitleOutlineColor?: "black" | "white";
   cardSurfaceLayout?: TournamentCardSurfaceLayout;
   /** 하단 날짜/장소 분리영역 배경색 */
@@ -89,6 +93,8 @@ type TournamentSlidePreviewItem = {
   cardDescriptionTextColor?: string | null;
   cardTextShadowEnabled?: boolean;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardExtraLine1Effect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardExtraLine2Effect?: "none" | "shadow" | "outline" | "shadow_outline";
   cardTitleOutlineColor?: "black" | "white";
   cardSurfaceLayout?: TournamentCardSurfaceLayout;
   cardBottomBarColor?: string | null;
@@ -100,6 +106,19 @@ type TournamentSlidePreviewItem = {
 };
 
 type SlidePreviewVariant = "classic" | "frame";
+
+type CardTextFx = "none" | "shadow" | "outline" | "shadow_outline";
+
+function lineSlotEffectClassList(effect: CardTextFx | undefined, outlineIsWhite: boolean): string {
+  const e = effect ?? "none";
+  const parts: string[] = [];
+  if (e === "shadow" || e === "shadow_outline") parts.push(styles.cardLineEffectShadow);
+  if (e === "outline" || e === "shadow_outline") {
+    parts.push(styles.cardLineEffectOutline);
+    if (outlineIsWhite) parts.push(styles.cardLineEffectOutlineWhite);
+  }
+  return parts.filter(Boolean).join(" ");
+}
 
 function slideDeckItemToPreviewItem(item: SlideDeckItem): TournamentSlidePreviewItem {
   const isAd = item.type === "ad";
@@ -122,6 +141,8 @@ function slideDeckItemToPreviewItem(item: SlideDeckItem): TournamentSlidePreview
     cardDescriptionTextColor: item.cardDescriptionTextColor,
     cardTextShadowEnabled: item.cardTextShadowEnabled,
     cardTitleEffect: item.cardTitleEffect,
+    cardExtraLine1Effect: item.cardExtraLine1Effect,
+    cardExtraLine2Effect: item.cardExtraLine2Effect,
     cardTitleOutlineColor: item.cardTitleOutlineColor,
     cardSurfaceLayout: item.cardSurfaceLayout === "full" ? "full" : "split",
     cardBottomBarColor: item.cardBottomBarColor,
@@ -311,6 +332,8 @@ function TournamentSlideCardPreview({
   const titleColor = (item.cardTitleTextColor ?? "").trim();
   const descColor = (item.cardDescriptionTextColor ?? "").trim();
   const titleEffect = item.cardTitleEffect ?? "none";
+  const leadLineEffect = item.cardExtraLine1Effect ?? "none";
+  const descLineEffect = item.cardExtraLine2Effect ?? "none";
   const titleOutlineColor = item.cardTitleOutlineColor === "white" ? "white" : "black";
   const useLayeredTitleOutline = titleEffect === "outline" || titleEffect === "shadow_outline";
   const statusBadge = <TournamentStatusBadge status={status} hideLabel={isImageCaptureMode} />;
@@ -363,18 +386,26 @@ function TournamentSlideCardPreview({
     templateCardLayout ? styles.cardRootTemplateLayout : "",
     tournamentPublishedHeightScale ? styles.cardRootTournamentPublishedScale : "",
     item.cardTextShadowEnabled ? styles.cardTextShadowOn : "",
-    titleEffect === "shadow" ? styles.cardTitleEffectShadow : "",
-    titleEffect === "outline" ? styles.cardTitleEffectOutline : "",
-    titleEffect === "outline" && titleOutlineColor === "white" ? styles.cardTitleEffectOutlineWhite : "",
-    titleEffect === "shadow_outline" ? styles.cardTitleEffectShadowOutline : "",
-    titleEffect === "shadow_outline" && titleOutlineColor === "white"
-      ? styles.cardTitleEffectShadowOutlineWhite
-      : "",
+    ...(useLayeredTitleOutline
+      ? [
+          titleEffect === "outline" ? styles.cardTitleEffectOutline : "",
+          titleEffect === "outline" && titleOutlineColor === "white" ? styles.cardTitleEffectOutlineWhite : "",
+          titleEffect === "shadow_outline" ? styles.cardTitleEffectShadowOutline : "",
+          titleEffect === "shadow_outline" && titleOutlineColor === "white"
+            ? styles.cardTitleEffectShadowOutlineWhite
+            : "",
+        ]
+      : []),
     mainSlideAd ? styles.cardRootMainSlideAd : "",
     artboardPx ? styles.cardRootArtboardPx : "",
   ]
     .filter(Boolean)
     .join(" ");
+
+  const titleSelfShadowClass =
+    !useLayeredTitleOutline && titleEffect === "shadow" ? styles.cardLineEffectShadow : "";
+  const leadFxClass = lineSlotEffectClassList(leadLineEffect, titleOutlineColor === "white");
+  const descFxClass = lineSlotEffectClassList(descLineEffect, titleOutlineColor === "white");
 
   const layoutStableSlots = editorPreviewFixedLayout || artboardPx;
   const showLeadBlock = layoutStableSlots || lead.length > 0;
@@ -452,7 +483,7 @@ function TournamentSlideCardPreview({
                     <p
                       data-tournament-card-overlay="lead"
                       data-outline-content-item="1"
-                      className={`${styles.classicLead} ${captureHideGlyphClass}`.trim()}
+                      className={`${styles.classicLead} ${captureHideGlyphClass} ${leadFxClass}`.trim()}
                       style={leadColor ? { color: leadColor } : undefined}
                     >
                       {leadDisplay}
@@ -461,7 +492,7 @@ function TournamentSlideCardPreview({
                   <h3
                     data-tournament-card-overlay="title"
                     {...(!useLayeredTitleOutline ? { "data-outline-content-item": "1" as const } : {})}
-                    className={`${styles.classicTitle} ${useLayeredTitleOutline ? styles.cardTitleWithLayeredOutline : ""} ${captureHideGlyphClass}`.trim()}
+                    className={`${styles.classicTitle} ${useLayeredTitleOutline ? styles.cardTitleWithLayeredOutline : ""} ${titleSelfShadowClass} ${captureHideGlyphClass}`.trim()}
                     style={!useLayeredTitleOutline && titleColor ? { color: titleColor } : undefined}
                   >
                     {useLayeredTitleOutline ? (
@@ -497,7 +528,7 @@ function TournamentSlideCardPreview({
                     <p
                       data-tournament-card-overlay="subtitle"
                       data-outline-content-item="1"
-                      className={`${styles.classicDesc} ${captureHideGlyphClass}`.trim()}
+                      className={`${styles.classicDesc} ${captureHideGlyphClass} ${descFxClass}`.trim()}
                       style={descColor ? { color: descColor } : undefined}
                     >
                       {descDisplay}
@@ -554,7 +585,7 @@ function TournamentSlideCardPreview({
                   <p
                     data-tournament-card-overlay="lead"
                     data-outline-content-item="1"
-                    className={`${styles.frameLead} ${captureHideGlyphClass}`.trim()}
+                    className={`${styles.frameLead} ${captureHideGlyphClass} ${leadFxClass}`.trim()}
                     style={leadColor ? { color: leadColor } : undefined}
                   >
                     {leadDisplay}
@@ -563,7 +594,7 @@ function TournamentSlideCardPreview({
                 <h3
                   data-tournament-card-overlay="title"
                   {...(!useLayeredTitleOutline ? { "data-outline-content-item": "1" as const } : {})}
-                  className={`${styles.frameTitle} ${useLayeredTitleOutline ? styles.cardTitleWithLayeredOutline : ""} ${captureHideGlyphClass}`.trim()}
+                  className={`${styles.frameTitle} ${useLayeredTitleOutline ? styles.cardTitleWithLayeredOutline : ""} ${titleSelfShadowClass} ${captureHideGlyphClass}`.trim()}
                   style={!useLayeredTitleOutline && titleColor ? { color: titleColor } : undefined}
                 >
                   {useLayeredTitleOutline ? (
@@ -599,7 +630,7 @@ function TournamentSlideCardPreview({
                   <p
                     data-tournament-card-overlay="subtitle"
                     data-outline-content-item="1"
-                    className={`${styles.frameDesc} ${captureHideGlyphClass}`.trim()}
+                    className={`${styles.frameDesc} ${captureHideGlyphClass} ${descFxClass}`.trim()}
                     style={descColor ? { color: descColor } : undefined}
                   >
                     {descDisplay}

@@ -8,6 +8,10 @@ import {
   registerCaromExplicitNativeLandscapeSession,
   unregisterCaromExplicitNativeLandscapeSession,
 } from "../../../native-fullscreen-orientation-lock";
+import {
+  bracketSlotDisplayName,
+  isBracketSlotDataEmpty,
+} from "../../../../../lib/bracket-player-slot";
 import styles from "./interactive-bracket-board.module.css";
 import {
   calculateLayout,
@@ -61,9 +65,8 @@ function isOpsDrawerSwipeBlockedTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest("button, a, input, select, textarea, [role='button'], label"));
 }
 
-function bracketSlotLabel(p: { name: string; displayName?: string | null }): string {
-  const d = typeof p.displayName === "string" ? p.displayName.trim() : "";
-  return d || p.name;
+function bracketSlotLabel(p: BoardPlayerSlot): string {
+  return bracketSlotDisplayName(p);
 }
 
 /** 대진표 보기 툴바: 가로 전환 안내(폰이 가로로 누운 형태) */
@@ -137,8 +140,7 @@ function slotUserIdForHighlight(raw: BoardPlayerSlot | null): string {
 function opponentSlotLooksFilled(raw: BoardPlayerSlot | null): boolean {
   if (!raw) return false;
   if (slotUserIdForHighlight(raw)) return true;
-  const name = (raw.name ?? "").trim();
-  return name !== "" && name !== "대기";
+  return !isBracketSlotDataEmpty(raw);
 }
 
 function cascadeClearWinnerByPairState(

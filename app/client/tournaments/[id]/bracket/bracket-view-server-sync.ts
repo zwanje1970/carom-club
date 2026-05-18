@@ -28,6 +28,7 @@ export type BracketLike = {
 export function isEligibleBracketWinnerUserId(userId: string): boolean {
   const w = typeof userId === "string" ? userId.trim() : "";
   if (!w || w === "__none" || w.startsWith("__TBD__")) return false;
+  if (w.startsWith("__FIN_WAIT__") || w.startsWith("__FIN_SLOT__")) return false;
   return true;
 }
 

@@ -318,7 +318,7 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
   );
 });
 
-const DESCRIPTION1_MAX_LINES = 1;
+const DESCRIPTION1_MAX_LINES = 3;
 const DESCRIPTION2_MAX_LINES = 2;
 const TITLE_MAX_LINES = 3;
 const FOOTER_FIELD_MAX_LINES = 1;
@@ -354,10 +354,13 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
   cardPlace,
   setCardPlace,
   statusTextReadonly,
-  cardTitleEffect,
-  setCardTitleEffect,
+  textEffectApplyTarget,
+  setTextEffectApplyTarget,
+  displayedCardTextEffect,
+  onPickCardTextEffect,
   cardTitleOutlineColor,
   setCardTitleOutlineColor,
+  showOutlineSwatchesForTextEffect,
   disabled = false,
 }: {
   leadTextColor: string;
@@ -381,10 +384,13 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
   cardPlace: string;
   setCardPlace: (v: string) => void;
   statusTextReadonly: string;
-  cardTitleEffect: "none" | "shadow" | "outline" | "shadow_outline";
-  setCardTitleEffect: (v: "none" | "shadow" | "outline" | "shadow_outline") => void;
+  textEffectApplyTarget: "all" | "extra1" | "title" | "extra2";
+  setTextEffectApplyTarget: (v: "all" | "extra1" | "title" | "extra2") => void;
+  displayedCardTextEffect: "none" | "shadow" | "outline" | "shadow_outline" | null;
+  onPickCardTextEffect: (v: "none" | "shadow" | "outline" | "shadow_outline") => void;
   cardTitleOutlineColor: "black" | "white";
   setCardTitleOutlineColor: (v: "black" | "white") => void;
+  showOutlineSwatchesForTextEffect: boolean;
   disabled?: boolean;
 }) {
   return (
@@ -406,8 +412,8 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
           </div>
         </div>
         <textarea
-          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight} ${editorStyles.fieldTextareaSingleLine}`}
-          rows={1}
+          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight} ${editorStyles.fieldTextareaDesc2}`}
+          rows={3}
           value={textLine1}
           disabled={disabled}
           onChange={(e) => setTextLine1(clampDescriptionToMaxLines(e.target.value, DESCRIPTION1_MAX_LINES))}
@@ -543,39 +549,59 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
       </div>
 
       <div className={editorStyles.field}>
-        <span className={editorStyles.fieldLabel}>제목 효과</span>
+        <div className={editorStyles.fieldHead}>
+          <span className={editorStyles.fieldLabel}>텍스트 효과</span>
+        </div>
+        <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.45rem", alignItems: "center", marginBottom: "0.35rem" }}>
+          <label className="v3-stack" style={{ gap: "0.2rem", margin: 0 }}>
+            <span className="v3-muted" style={{ fontSize: "0.72rem", fontWeight: 700 }}>
+              적용 대상
+            </span>
+            <select
+              className={editorStyles.cardTextFxTargetSelect}
+              disabled={disabled}
+              value={textEffectApplyTarget}
+              aria-label="텍스트 효과 적용 대상"
+              onChange={(e) =>
+                setTextEffectApplyTarget(e.target.value as "all" | "extra1" | "title" | "extra2")
+              }
+            >
+              <option value="all">전체</option>
+              <option value="extra1">설명1</option>
+              <option value="title">제목</option>
+              <option value="extra2">설명2</option>
+            </select>
+          </label>
+        </div>
         <div className="v3-row" style={{ flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
           <button
             type="button"
-            className="v3-btn"
-            aria-pressed={cardTitleEffect === "none"}
+            className={`${editorStyles.cardTextFxBtn} ${displayedCardTextEffect === "none" ? editorStyles.cardTextFxBtnSelected : ""}`}
+            aria-pressed={displayedCardTextEffect === "none"}
             disabled={disabled}
-            style={{ fontWeight: cardTitleEffect === "none" ? 800 : 600 }}
-            onClick={() => setCardTitleEffect("none")}
+            onClick={() => onPickCardTextEffect("none")}
           >
             없음
           </button>
           <button
             type="button"
-            className="v3-btn"
-            aria-pressed={cardTitleEffect === "shadow"}
+            className={`${editorStyles.cardTextFxBtn} ${displayedCardTextEffect === "shadow" ? editorStyles.cardTextFxBtnSelected : ""}`}
+            aria-pressed={displayedCardTextEffect === "shadow"}
             disabled={disabled}
-            style={{ fontWeight: cardTitleEffect === "shadow" ? 800 : 600 }}
-            onClick={() => setCardTitleEffect("shadow")}
+            onClick={() => onPickCardTextEffect("shadow")}
           >
             그림자
           </button>
           <button
             type="button"
-            className="v3-btn"
-            aria-pressed={cardTitleEffect === "outline"}
+            className={`${editorStyles.cardTextFxBtn} ${displayedCardTextEffect === "outline" ? editorStyles.cardTextFxBtnSelected : ""}`}
+            aria-pressed={displayedCardTextEffect === "outline"}
             disabled={disabled}
-            style={{ fontWeight: cardTitleEffect === "outline" ? 800 : 600 }}
-            onClick={() => setCardTitleEffect("outline")}
+            onClick={() => onPickCardTextEffect("outline")}
           >
             외곽선
           </button>
-          {(cardTitleEffect === "outline" || cardTitleEffect === "shadow_outline") ? (
+          {showOutlineSwatchesForTextEffect ? (
             <div className={editorStyles.fieldSwatches} role="group" aria-label="외곽선 색상">
               <button
                 type="button"
@@ -599,11 +625,10 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
           ) : null}
           <button
             type="button"
-            className="v3-btn"
-            aria-pressed={cardTitleEffect === "shadow_outline"}
+            className={`${editorStyles.cardTextFxBtn} ${displayedCardTextEffect === "shadow_outline" ? editorStyles.cardTextFxBtnSelected : ""}`}
+            aria-pressed={displayedCardTextEffect === "shadow_outline"}
             disabled={disabled}
-            style={{ fontWeight: cardTitleEffect === "shadow_outline" ? 800 : 600 }}
-            onClick={() => setCardTitleEffect("shadow_outline")}
+            onClick={() => onPickCardTextEffect("shadow_outline")}
           >
             그림자 + 외곽선
           </button>

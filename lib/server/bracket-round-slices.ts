@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { getShuffleRoundBlockedReason } from "../bracket-shuffle-guards";
+import { emptyBracketPlayerSlot, isBracketSlotDataEmpty } from "../bracket-player-slot";
 
 import type {
   BracketPlayer,
@@ -77,8 +78,10 @@ export function collectAllPlayersFromBracket(bracket: MutableBracket): Map<strin
   for (const slice of listMutableRoundSlices(bracket)) {
     for (const round of slice.rounds) {
       for (const match of round.matches) {
-        playerMap.set(match.player1.userId, match.player1);
-        playerMap.set(match.player2.userId, match.player2);
+        const u1 = match.player1.userId?.trim() ?? "";
+        const u2 = match.player2.userId?.trim() ?? "";
+        if (u1) playerMap.set(u1, match.player1);
+        if (u2) playerMap.set(u2, match.player2);
       }
     }
   }
@@ -107,19 +110,30 @@ export function normalizeRoundStatusesEverywhere(mut: MutableBracket): void {
   }
 }
 
+export function bracketMatchListHasAnyRealParticipant(matches: MutableBracketMatch[]): boolean {
+  return matches.some((m) => !isBracketSlotDataEmpty(m.player1) || !isBracketSlotDataEmpty(m.player2));
+}
+
+/** 슬라이스 내 최소 roundNumber(운영 시작 라운드)는 유지, 그 외 실참가자 0명 라운드는 제거 */
+export function pruneEmptyRoundsFromSliceInPlace(rounds: MutableBracketRound[]): void {
+  if (rounds.length === 0) return;
+  const minRn = Math.min(...rounds.map((r) => r.roundNumber));
+  const kept = rounds.filter(
+    (r) => r.roundNumber === minRn || bracketMatchListHasAnyRealParticipant(r.matches),
+  );
+  if (kept.length !== rounds.length) {
+    rounds.length = 0;
+    rounds.push(...kept);
+  }
+  normalizeRoundStatusesInSlice(rounds);
+}
+
 function matchWinnerPlayerOrNull(match: MutableBracketMatch): BracketPlayer | null {
   if (match.status !== "COMPLETED") return null;
   const wid = typeof match.winnerUserId === "string" ? match.winnerUserId.trim() : "";
   const wnm = typeof match.winnerName === "string" ? match.winnerName.trim() : "";
   if (!wid || !wnm) return null;
   return { userId: wid, name: wnm };
-}
-
-function tbdPlayer(nextRoundNumber: number, pairIndex: number, slot: "player1" | "player2"): BracketPlayer {
-  return {
-    userId: `__TBD__:${nextRoundNumber}:${pairIndex}:${slot}`,
-    name: "TBD",
-  };
 }
 
 export function buildNextRoundMatchesFromRoundSlice(params: {
@@ -140,12 +154,15 @@ export function buildNextRoundMatchesFromRoundSlice(params: {
     }
     nextMatches.push({
       id: randomUUID(),
-      player1: w1 ?? tbdPlayer(nextRoundNumber, i, "player1"),
-      player2: w2 ?? tbdPlayer(nextRoundNumber, i, "player2"),
+      player1: w1 ?? emptyBracketPlayerSlot(),
+      player2: w2 ?? emptyBracketPlayerSlot(),
       winnerUserId: null,
       winnerName: null,
       status: "PENDING",
     });
+  }
+  if (nextMatches.length > 0 && !bracketMatchListHasAnyRealParticipant(nextMatches)) {
+    return null;
   }
   return nextMatches;
 }
@@ -171,7 +188,7 @@ export function syncFinalBlockFromQualifiersInPlace(bracket: MutableBracket): vo
     if (manual[String(blockIndex)]) continue;
     const block = bracket.blocks[blockIndex]!;
     const w = extractBlockWinnerPlayer(block);
-    const p: BracketPlayer = w ?? { userId: `__FIN_WAIT__:${block.id}`, name: "" };
+    const p: BracketPlayer = w ?? emptyBracketPlayerSlot();
     const matchIdx = Math.floor(blockIndex / 2);
     const useP1 = blockIndex % 2 === 0;
     const match = r1.matches[matchIdx];
@@ -183,6 +200,7 @@ export function syncFinalBlockFromQualifiersInPlace(bracket: MutableBracket): vo
     match.status = "PENDING";
   }
   normalizeRoundStatusesInSlice(bracket.finalBlock.rounds);
+  pruneEmptyRoundsFromSliceInPlace(bracket.finalBlock.rounds);
 }
 
 /** 지정 라운드 슬롯만 Fisher–Yates 재배열. 상위 라운드는 truncate 후 해당 라운드 승자만 초기화 */
@@ -213,7 +231,7 @@ export function shuffleRoundSlotValuesInSlice(rounds: MutableBracketRound[], rou
     m.winnerName = null;
     m.status = "PENDING";
   }
-  normalizeRoundStatusesInSlice(rounds);
+  pruneEmptyRoundsFromSliceInPlace(rounds);
 }
 
 export function shuffleRoundOneSlotValuesInSlice(rounds: MutableBracketRound[]): void {
@@ -239,6 +257,7 @@ export function rebuildChainFromRoundInSlice(params: {
       allowPartial,
     });
     if (!nextMatches || nextMatches.length === 0) break;
+    if (!bracketMatchListHasAnyRealParticipant(nextMatches)) break;
     rounds.push({
       roundNumber: nextRoundNumber,
       matches: nextMatches,
@@ -247,5 +266,5 @@ export function rebuildChainFromRoundInSlice(params: {
     currentRoundNumber = nextRoundNumber;
     if (nextMatches.length === 1) break;
   }
-  normalizeRoundStatusesInSlice(rounds);
+  pruneEmptyRoundsFromSliceInPlace(rounds);
 }

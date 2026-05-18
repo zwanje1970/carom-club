@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { DEPOSIT_UNCONFIRM_REQUIRES_APPROVAL_REVOKED_FIRST } from "../tournament-application-processing-guards";
 import { assertClientFirestorePersistenceConfigured } from "./firestore-client-applications";
 import { getTournamentZoneById } from "./firestore-tournament-zones";
 import { getTournamentByIdFirestore, listAllTournamentsFirestore, listTournamentsByCreatorFirestore } from "./firestore-tournaments";
@@ -890,9 +891,10 @@ export async function patchTournamentApplicationProcessingFirestore(params: {
     if (params.depositConfirmed === true) {
       patch.clientDepositConfirmedAt = now;
     } else {
+      if (hasNonEmptyIsoAt(application.clientApplicationApprovedAt)) {
+        return { ok: false, error: DEPOSIT_UNCONFIRM_REQUIRES_APPROVAL_REVOKED_FIRST };
+      }
       patch.clientDepositConfirmedAt = null;
-      patch.clientApplicationApprovedAt = null;
-      patch.processingApprovedNotifiedAt = null;
     }
   } else if (params.applicationApproved === true) {
     const dep =

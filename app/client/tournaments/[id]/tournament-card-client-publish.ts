@@ -29,6 +29,8 @@ type CardSnapshotRow = {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardExtraLine1Effect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardExtraLine2Effect?: "none" | "shadow" | "outline" | "shadow_outline";
   cardTitleOutlineColor?: "black" | "white";
   cardBottomBarColor?: string | null;
   cardBottomBarOpacity?: number | null;
@@ -250,6 +252,8 @@ export async function publishTournamentCardFromEditorClient(args: {
         ? { cardDescriptionTextColor: publishSource.cardDescriptionTextColor.trim() }
         : {}),
       ...(publishSource.cardTitleEffect ? { cardTitleEffect: publishSource.cardTitleEffect } : {}),
+      ...(publishSource.cardExtraLine1Effect ? { cardExtraLine1Effect: publishSource.cardExtraLine1Effect } : {}),
+      ...(publishSource.cardExtraLine2Effect ? { cardExtraLine2Effect: publishSource.cardExtraLine2Effect } : {}),
       ...(publishSource.cardTitleOutlineColor ? { cardTitleOutlineColor: publishSource.cardTitleOutlineColor } : {}),
       ...(typeof publishSource.cardBottomBarColor === "string"
         ? { cardBottomBarColor: publishSource.cardBottomBarColor }

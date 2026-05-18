@@ -30,6 +30,8 @@ export type CardPublishPreviewModel = {
   slideDescTextColor?: string;
   slideTextShadowEnabled: boolean;
   slideTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  slideExtraLine1Effect?: "none" | "shadow" | "outline" | "shadow_outline";
+  slideExtraLine2Effect?: "none" | "shadow" | "outline" | "shadow_outline";
   slideTitleOutlineColor?: "black" | "white";
   slideBottomBarColor?: string;
   slideBottomBarOpacity?: number;
@@ -64,6 +66,8 @@ function slideItemFromModel(
     ...(m.slideDescTextColor ? { cardDescriptionTextColor: m.slideDescTextColor } : {}),
     ...(m.slideTextShadowEnabled ? { cardTextShadowEnabled: true } : {}),
     ...(m.slideTitleEffect ? { cardTitleEffect: m.slideTitleEffect } : {}),
+    ...(m.slideExtraLine1Effect ? { cardExtraLine1Effect: m.slideExtraLine1Effect } : {}),
+    ...(m.slideExtraLine2Effect ? { cardExtraLine2Effect: m.slideExtraLine2Effect } : {}),
     ...(m.slideTitleOutlineColor ? { cardTitleOutlineColor: m.slideTitleOutlineColor } : {}),
     ...(m.slideBottomBarColor ? { cardBottomBarColor: m.slideBottomBarColor } : {}),
     ...(typeof m.slideBottomBarOpacity === "number" ? { cardBottomBarOpacity: m.slideBottomBarOpacity } : {}),
@@ -104,15 +108,20 @@ const CardPublishPreviewInner = forwardRef<
   );
 
   const cardEditorTypography = useMemo(() => {
-    const e = model.slideTitleEffect ?? "none";
-    const outlineAccent = e === "outline" || e === "shadow_outline";
+    const titleE = model.slideTitleEffect ?? "none";
+    const leadE = model.slideExtraLine1Effect ?? "none";
+    const descE = model.slideExtraLine2Effect ?? "none";
+    const titleOutlineAccent = titleE === "outline" || titleE === "shadow_outline";
+    const anyBodyOutline =
+      leadE === "outline" ||
+      leadE === "shadow_outline" ||
+      descE === "outline" ||
+      descE === "shadow_outline";
     return {
-      /** Bold / ExtraBold OTF */
-      titleWeight: outlineAccent ? 800 : 700,
-      /** Light / Medium OTF */
-      bodyWeight: outlineAccent ? 500 : 300,
+      titleWeight: titleOutlineAccent ? 800 : 700,
+      bodyWeight: anyBodyOutline ? 500 : 300,
     };
-  }, [model.slideTitleEffect]);
+  }, [model.slideTitleEffect, model.slideExtraLine1Effect, model.slideExtraLine2Effect]);
 
   useLayoutEffect(() => {
     const root = typeof ref === "function" ? null : ref?.current;

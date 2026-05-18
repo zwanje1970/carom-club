@@ -361,7 +361,7 @@ export default function TournamentBracketBoardViewPage() {
         );
         const result = (await response.json()) as { bracket?: Bracket; error?: string };
         if (!response.ok || !result.bracket) {
-          return { ok: false as const, error: result.error ?? "다음 라운드 생성에 실패했습니다." };
+          return { ok: false as const, error: result.error ?? "대진표를 갱신하지 못했습니다." };
         }
         return { ok: true as const, bracket: result.bracket as BracketLike };
       },

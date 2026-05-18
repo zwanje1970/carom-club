@@ -5,6 +5,7 @@ import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink, writeFi
 import path from "path";
 import { fileURLToPath } from "url";
 import { AuthRole } from "../auth/roles";
+import { isBracketSlotDataEmpty, normalizeBracketPlayerSlot } from "../bracket-player-slot";
 import {
   CACHE_TAG_SITE_COMMUNITY_CONFIG,
   CACHE_TAG_SITE_LAYOUT_CONFIG,
@@ -859,6 +860,8 @@ export type TournamentPublishedCard = {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardExtraLine1Effect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardExtraLine2Effect?: "none" | "shadow" | "outline" | "shadow_outline";
   cardTitleOutlineColor?: "black" | "white";
   cardBottomBarColor?: string | null;
   cardBottomBarOpacity?: number | null;
@@ -933,6 +936,8 @@ export type PublishedCardSnapshot = {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardExtraLine1Effect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardExtraLine2Effect?: "none" | "shadow" | "outline" | "shadow_outline";
   cardTitleOutlineColor?: "black" | "white";
   cardBottomBarColor?: string | null;
   cardBottomBarOpacity?: number | null;
@@ -2812,6 +2817,24 @@ function normalizeTournamentPublishedCardRow(row: unknown): TournamentPublishedC
   } else if ("cardTitleEffect" in r) {
     base.cardTitleEffect = "none";
   }
+  if (
+    r.cardExtraLine1Effect === "shadow" ||
+    r.cardExtraLine1Effect === "outline" ||
+    r.cardExtraLine1Effect === "shadow_outline"
+  ) {
+    base.cardExtraLine1Effect = r.cardExtraLine1Effect;
+  } else if ("cardExtraLine1Effect" in r) {
+    base.cardExtraLine1Effect = "none";
+  }
+  if (
+    r.cardExtraLine2Effect === "shadow" ||
+    r.cardExtraLine2Effect === "outline" ||
+    r.cardExtraLine2Effect === "shadow_outline"
+  ) {
+    base.cardExtraLine2Effect = r.cardExtraLine2Effect;
+  } else if ("cardExtraLine2Effect" in r) {
+    base.cardExtraLine2Effect = "none";
+  }
   if ("cardTitleOutlineColor" in r) {
     base.cardTitleOutlineColor = r.cardTitleOutlineColor === "white" ? "white" : "black";
   }
@@ -3838,18 +3861,52 @@ export function deriveRoundStatus(matches: Array<Pick<BracketMatch, "status">>):
   return "IN_PROGRESS";
 }
 
+function pruneEmptyRoundsInMutableRoundSlice(rounds: MutableBracketRound[]): void {
+  if (rounds.length === 0) return;
+  const minRn = Math.min(...rounds.map((r) => r.roundNumber));
+  const kept = rounds.filter(
+    (r) =>
+      r.roundNumber === minRn ||
+      r.matches.some((m) => !isBracketSlotDataEmpty(m.player1) || !isBracketSlotDataEmpty(m.player2)),
+  );
+  if (kept.length !== rounds.length) {
+    rounds.length = 0;
+    rounds.push(...kept);
+  }
+  for (const r of rounds) {
+    r.status = deriveRoundStatus(r.matches);
+  }
+}
+
 function normalizeMutableRoundsInPlace(rounds: MutableBracketRound[]): void {
   const mapped = (rounds ?? []).map((round, roundIndex) => {
     const normalizedMatches = (round.matches ?? []).map((match) => {
       const winnerUserId = match.winnerUserId ?? null;
       const winnerName = match.winnerName ?? null;
       const status: BracketMatchStatus = match.status ?? (winnerUserId ? "COMPLETED" : "PENDING");
-      return {
+      const player1 = normalizeBracketPlayerSlot(match.player1);
+      const player2 = normalizeBracketPlayerSlot(match.player2);
+      let substitutionBackupPlayer1 = match.substitutionBackupPlayer1
+        ? normalizeBracketPlayerSlot(match.substitutionBackupPlayer1)
+        : undefined;
+      let substitutionBackupPlayer2 = match.substitutionBackupPlayer2
+        ? normalizeBracketPlayerSlot(match.substitutionBackupPlayer2)
+        : undefined;
+      if (substitutionBackupPlayer1 && isBracketSlotDataEmpty(substitutionBackupPlayer1)) substitutionBackupPlayer1 = undefined;
+      if (substitutionBackupPlayer2 && isBracketSlotDataEmpty(substitutionBackupPlayer2)) substitutionBackupPlayer2 = undefined;
+      const base: MutableBracketMatch = {
         ...match,
         winnerUserId,
         winnerName,
         status,
+        player1,
+        player2,
       };
+      if (substitutionBackupPlayer1) base.substitutionBackupPlayer1 = substitutionBackupPlayer1;
+      else delete base.substitutionBackupPlayer1;
+      if (substitutionBackupPlayer2) base.substitutionBackupPlayer2 = substitutionBackupPlayer2;
+      else delete base.substitutionBackupPlayer2;
+      return base;
     });
 
     const status = deriveRoundStatus(normalizedMatches);
@@ -3866,16 +3923,20 @@ function normalizeMutableRoundsInPlace(rounds: MutableBracketRound[]): void {
 
 export function applyBracketDefaultsInPlace(bracket: MutableBracket): void {
   normalizeMutableRoundsInPlace(bracket.rounds ?? []);
+  pruneEmptyRoundsInMutableRoundSlice(bracket.rounds ?? []);
   if (Array.isArray(bracket.blocks)) {
     for (const block of bracket.blocks) {
       normalizeMutableRoundsInPlace(block.rounds ?? []);
+      pruneEmptyRoundsInMutableRoundSlice(block.rounds ?? []);
     }
   }
   if (bracket.finalBlock?.rounds) {
     normalizeMutableRoundsInPlace(bracket.finalBlock.rounds);
+    pruneEmptyRoundsInMutableRoundSlice(bracket.finalBlock.rounds);
   }
   if (Array.isArray(bracket.preSplitRootRounds) && bracket.preSplitRootRounds.length > 0) {
     normalizeMutableRoundsInPlace(bracket.preSplitRootRounds);
+    pruneEmptyRoundsInMutableRoundSlice(bracket.preSplitRootRounds);
   }
 }
 
@@ -9776,6 +9837,24 @@ function tournamentPublishedCardToPublishedSnapshot(
   } else {
     snap.cardTitleEffect = "none";
   }
+  if (
+    t.cardExtraLine1Effect === "shadow" ||
+    t.cardExtraLine1Effect === "outline" ||
+    t.cardExtraLine1Effect === "shadow_outline"
+  ) {
+    snap.cardExtraLine1Effect = t.cardExtraLine1Effect;
+  } else {
+    snap.cardExtraLine1Effect = "none";
+  }
+  if (
+    t.cardExtraLine2Effect === "shadow" ||
+    t.cardExtraLine2Effect === "outline" ||
+    t.cardExtraLine2Effect === "shadow_outline"
+  ) {
+    snap.cardExtraLine2Effect = t.cardExtraLine2Effect;
+  } else {
+    snap.cardExtraLine2Effect = "none";
+  }
   snap.cardTitleOutlineColor = t.cardTitleOutlineColor === "white" ? "white" : "black";
   if (typeof t.cardBottomBarColor === "string") {
     snap.cardBottomBarColor = t.cardBottomBarColor;
@@ -9847,6 +9926,8 @@ export async function upsertTournamentPublishedCard(params: {
   cardTitleTextColor?: string | null;
   cardDescriptionTextColor?: string | null;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardExtraLine1Effect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardExtraLine2Effect?: "none" | "shadow" | "outline" | "shadow_outline";
   cardTitleOutlineColor?: "black" | "white";
   cardBottomBarColor?: string | null;
   cardBottomBarOpacity?: number | null;
@@ -10037,6 +10118,18 @@ export async function upsertTournamentPublishedCard(params: {
     params.cardTitleEffect === "outline" ||
     params.cardTitleEffect === "shadow_outline"
       ? params.cardTitleEffect
+      : "none";
+  row.cardExtraLine1Effect =
+    params.cardExtraLine1Effect === "shadow" ||
+    params.cardExtraLine1Effect === "outline" ||
+    params.cardExtraLine1Effect === "shadow_outline"
+      ? params.cardExtraLine1Effect
+      : "none";
+  row.cardExtraLine2Effect =
+    params.cardExtraLine2Effect === "shadow" ||
+    params.cardExtraLine2Effect === "outline" ||
+    params.cardExtraLine2Effect === "shadow_outline"
+      ? params.cardExtraLine2Effect
       : "none";
   row.cardTitleOutlineColor = params.cardTitleOutlineColor === "white" ? "white" : "black";
   if (params.cardBottomBarColor !== undefined) {

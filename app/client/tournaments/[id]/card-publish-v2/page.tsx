@@ -199,6 +199,8 @@ type TournamentSummary = {
 };
 
 type SnapshotPick = {
+  snapshotId?: string;
+  updatedAt?: string;
   title?: string;
   cardExtraLine1?: string | null;
   cardExtraLine2?: string | null;
@@ -219,6 +221,8 @@ type SnapshotPick = {
   cardDescriptionTextColor?: string | null;
   tournamentCardTextShadowEnabled?: boolean;
   cardTitleEffect?: "none" | "shadow" | "outline" | "shadow_outline";
+  cardExtraLine1Effect?: "none" | "shadow" | "outline" | "shadow_outline" | string | null;
+  cardExtraLine2Effect?: "none" | "shadow" | "outline" | "shadow_outline" | string | null;
   cardTitleOutlineColor?: "black" | "white" | null;
   tournamentCardSurfaceLayout?: TournamentCardSurfaceLayout;
   cardBottomBarColor?: string | null;
@@ -255,6 +259,27 @@ function hasStoredV2Media(pick: SnapshotPick): boolean {
   );
 }
 
+type CardTextFx = "none" | "shadow" | "outline" | "shadow_outline";
+
+const CARD_PUBLISH_V2_LOCAL_DRAFT_PREFIX = "carom.cardPublishV2.draft:v1|";
+
+function cardPublishV2LocalDraftKey(tournamentId: string): string {
+  return `${CARD_PUBLISH_V2_LOCAL_DRAFT_PREFIX}${tournamentId}`;
+}
+
+function parseStoredCardTextFx(v: unknown): CardTextFx {
+  return v === "shadow" || v === "outline" || v === "shadow_outline" ? v : "none";
+}
+
+function clearCardPublishV2LocalDraft(tournamentId: string): void {
+  if (typeof window === "undefined" || !tournamentId.trim()) return;
+  try {
+    window.localStorage.removeItem(cardPublishV2LocalDraftKey(tournamentId));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
 export default function ClientTournamentCardPublishV2Page() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -282,7 +307,10 @@ export default function ClientTournamentCardPublishV2Page() {
   const [v2MediaMode, setV2MediaMode] = useState<"inherit" | "on">("on");
   const [cardTextShadowEnabled] = useState(false);
   const [cardSurfaceLayout] = useState<TournamentCardSurfaceLayout>("split");
-  const [cardTitleEffect, setCardTitleEffect] = useState<"none" | "shadow" | "outline" | "shadow_outline">("none");
+  const [cardTitleEffect, setCardTitleEffect] = useState<CardTextFx>("none");
+  const [cardExtraLine1Effect, setCardExtraLine1Effect] = useState<CardTextFx>("none");
+  const [cardExtraLine2Effect, setCardExtraLine2Effect] = useState<CardTextFx>("none");
+  const [textEffectApplyTarget, setTextEffectApplyTarget] = useState<"all" | "extra1" | "title" | "extra2">("title");
   const [cardTitleOutlineColor, setCardTitleOutlineColor] = useState<"black" | "white">("black");
   const [bottomBarColor, setBottomBarColor] = useState("#ffffff");
   const [bottomBarOpacity, setBottomBarOpacity] = useState(1);
@@ -315,11 +343,46 @@ export default function ClientTournamentCardPublishV2Page() {
   const cardPublishPreviewCaptureRef = useRef<HTMLDivElement>(null);
   /** 캡처용 미리보기 `<img src>` — 저장 URL과 분리된 브라우저 로컬 소스(blob/data). */
   const [captureImageSrc, setCaptureImageSrc] = useState("");
+  const editorInitialLoadDoneRef = useRef(false);
+  const cardEditorBaselineKeyRef = useRef<string>("");
 
   const handleTextLine2Change = useCallback((next: string) => {
     userEditedTextLine2Ref.current = true;
     setTextLine2(next);
   }, []);
+
+  const displayedCardTextEffect = useMemo((): CardTextFx | null => {
+    if (textEffectApplyTarget === "title") return cardTitleEffect;
+    if (textEffectApplyTarget === "extra1") return cardExtraLine1Effect;
+    if (textEffectApplyTarget === "extra2") return cardExtraLine2Effect;
+    if (cardTitleEffect === cardExtraLine1Effect && cardTitleEffect === cardExtraLine2Effect) return cardTitleEffect;
+    return null;
+  }, [textEffectApplyTarget, cardTitleEffect, cardExtraLine1Effect, cardExtraLine2Effect]);
+
+  const showOutlineSwatchesForTextEffect = useMemo(() => {
+    if (displayedCardTextEffect === "outline" || displayedCardTextEffect === "shadow_outline") return true;
+    if (textEffectApplyTarget === "all") {
+      return [cardTitleEffect, cardExtraLine1Effect, cardExtraLine2Effect].some(
+        (e) => e === "outline" || e === "shadow_outline",
+      );
+    }
+    return false;
+  }, [displayedCardTextEffect, textEffectApplyTarget, cardTitleEffect, cardExtraLine1Effect, cardExtraLine2Effect]);
+
+  const onPickCardTextEffect = useCallback(
+    (next: CardTextFx) => {
+      if (textEffectApplyTarget === "all") {
+        setCardTitleEffect(next);
+        setCardExtraLine1Effect(next);
+        setCardExtraLine2Effect(next);
+        return;
+      }
+      if (textEffectApplyTarget === "title") setCardTitleEffect(next);
+      else if (textEffectApplyTarget === "extra1") setCardExtraLine1Effect(next);
+      else setCardExtraLine2Effect(next);
+    },
+    [textEffectApplyTarget],
+  );
 
   const backgroundType = uploadedImage ? "image" : "theme";
 
@@ -363,6 +426,8 @@ export default function ClientTournamentCardPublishV2Page() {
       slideDescTextColor: dc || undefined,
       slideTextShadowEnabled: cardTextShadowEnabled,
       slideTitleEffect: cardTitleEffect,
+      slideExtraLine1Effect: cardExtraLine1Effect,
+      slideExtraLine2Effect: cardExtraLine2Effect,
       slideTitleOutlineColor: cardTitleOutlineColor,
       slideBottomBarColor: bottomBarColor,
       slideBottomBarOpacity: bottomBarOpacity,
@@ -382,6 +447,8 @@ export default function ClientTournamentCardPublishV2Page() {
     descriptionTextColor,
     cardTextShadowEnabled,
     cardTitleEffect,
+    cardExtraLine1Effect,
+    cardExtraLine2Effect,
     cardTitleOutlineColor,
     cardSurfaceLayout,
     bottomBarColor,
@@ -525,6 +592,112 @@ export default function ClientTournamentCardPublishV2Page() {
           : active && isUsableSnapshotTitle(active.title)
             ? active
             : null;
+      const baselineSnapshotId = typeof pick?.snapshotId === "string" ? pick.snapshotId.trim() : "";
+      const baselineUpdatedAt = typeof pick?.updatedAt === "string" ? pick.updatedAt.trim() : "";
+      const baselineKey = pick ? `${baselineSnapshotId}\t${baselineUpdatedAt}` : "__none__";
+      cardEditorBaselineKeyRef.current = baselineKey;
+
+      let appliedLocalDraft = false;
+      if (typeof window !== "undefined") {
+        try {
+          const raw = window.localStorage.getItem(cardPublishV2LocalDraftKey(tournamentId));
+          if (raw) {
+            const doc = JSON.parse(raw) as { v?: number; baselineKey?: string; state?: Record<string, unknown> };
+            if (doc?.v === 1 && doc.baselineKey === baselineKey && doc.state && typeof doc.state === "object") {
+              const s = doc.state;
+              if (typeof s.title === "string") setTitle(s.title);
+              if (typeof s.textLine1 === "string") setTextLine1(s.textLine1);
+              if (typeof s.textLine2 === "string") setTextLine2(s.textLine2);
+              if (typeof s.cardDate === "string") setCardDate(s.cardDate);
+              if (typeof s.cardPlace === "string") setCardPlace(s.cardPlace);
+              if (typeof s.leadTextColor === "string") setLeadTextColor(s.leadTextColor);
+              if (typeof s.titleTextColor === "string") setTitleTextColor(s.titleTextColor);
+              if (typeof s.descriptionTextColor === "string") setDescriptionTextColor(s.descriptionTextColor);
+              if (s.themeType === "light" || s.themeType === "natural" || s.themeType === "dark") {
+                setThemeType(s.themeType);
+              }
+              if (typeof s.mediaBackground === "string") setMediaBackground(s.mediaBackground);
+              if (typeof s.imageOverlayOpacity === "number" && Number.isFinite(s.imageOverlayOpacity)) {
+                setImageOverlayOpacity(Math.min(1, Math.max(0.15, s.imageOverlayOpacity)));
+              }
+              if (s.v2MediaMode === "inherit" || s.v2MediaMode === "on") setV2MediaMode(s.v2MediaMode);
+              setCardTitleEffect(parseStoredCardTextFx(s.cardTitleEffect));
+              setCardExtraLine1Effect(parseStoredCardTextFx(s.cardExtraLine1Effect));
+              setCardExtraLine2Effect(parseStoredCardTextFx(s.cardExtraLine2Effect));
+              setCardTitleOutlineColor(s.cardTitleOutlineColor === "white" ? "white" : "black");
+              if (typeof s.bottomBarColor === "string") setBottomBarColor(s.bottomBarColor);
+              if (typeof s.bottomBarOpacity === "number" && Number.isFinite(s.bottomBarOpacity)) {
+                setBottomBarOpacity(Math.min(1, Math.max(0, s.bottomBarOpacity)));
+              }
+              if (
+                s.gradientPreset === "top" ||
+                s.gradientPreset === "left" ||
+                s.gradientPreset === "top_left" ||
+                s.gradientPreset === "soft" ||
+                s.gradientPreset === "none"
+              ) {
+                setGradientPreset(s.gradientPreset);
+              }
+              if (typeof s.gradientOpacity === "number" && Number.isFinite(s.gradientOpacity)) {
+                setGradientOpacity(Math.min(1, Math.max(0, s.gradientOpacity)));
+              }
+              if (typeof s.footerDateTextColor === "string") setFooterDateTextColor(s.footerDateTextColor);
+              if (typeof s.footerPlaceTextColor === "string") setFooterPlaceTextColor(s.footerPlaceTextColor);
+              if (s.publishIntent === "recruiting" || s.publishIntent === "draft") setPublishIntent(s.publishIntent);
+              if (s.editorTab === "background" || s.editorTab === "content") setEditorTab(s.editorTab);
+              if (
+                s.textEffectApplyTarget === "all" ||
+                s.textEffectApplyTarget === "extra1" ||
+                s.textEffectApplyTarget === "title" ||
+                s.textEffectApplyTarget === "extra2"
+              ) {
+                setTextEffectApplyTarget(s.textEffectApplyTarget);
+              }
+              if (typeof s.userEditedTextLine2 === "boolean") {
+                userEditedTextLine2Ref.current = s.userEditedTextLine2;
+              }
+              const img = s.uploadedImage as { imageId?: unknown; w320Url?: unknown; w640Url?: unknown } | null;
+              if (
+                img &&
+                typeof img.imageId === "string" &&
+                img.imageId.trim() &&
+                typeof img.w320Url === "string" &&
+                img.w320Url.trim()
+              ) {
+                clearCaptureImageSource();
+                setUploadedImage({
+                  imageId: img.imageId.trim(),
+                  w320Url: img.w320Url.trim(),
+                  w640Url:
+                    typeof img.w640Url === "string" && img.w640Url.trim() ? img.w640Url.trim() : img.w320Url.trim(),
+                });
+              } else {
+                clearCaptureImageSource();
+                setUploadedImage(null);
+              }
+              const cap = typeof s.captureImageSrc === "string" ? s.captureImageSrc : "";
+              if (cap.startsWith("blob:") || cap.startsWith("data:")) {
+                clearCaptureImageSource();
+              } else if (cap.trim()) {
+                setCaptureImageSrc(cap.trim());
+              } else {
+                clearCaptureImageSource();
+              }
+              appliedLocalDraft = true;
+            } else if (doc?.baselineKey != null && doc.baselineKey !== baselineKey) {
+              window.localStorage.removeItem(cardPublishV2LocalDraftKey(tournamentId));
+            }
+          }
+        } catch {
+          try {
+            window.localStorage.removeItem(cardPublishV2LocalDraftKey(tournamentId));
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      if (!appliedLocalDraft) {
       if (pick) {
         const snapRaw = pick.title ?? "";
         setTitle(snapRaw !== "" && snapRaw.trim() !== "(제목)" ? snapRaw : t.title);
@@ -545,6 +718,8 @@ export default function ClientTournamentCardPublishV2Page() {
             ? pick.cardTitleEffect
             : "none"
         );
+        setCardExtraLine1Effect(parseStoredCardTextFx(pick.cardExtraLine1Effect));
+        setCardExtraLine2Effect(parseStoredCardTextFx(pick.cardExtraLine2Effect));
         setCardTitleOutlineColor(pick.cardTitleOutlineColor === "white" ? "white" : "black");
         setBottomBarColor(
           typeof pick.cardBottomBarColor === "string" && pick.cardBottomBarColor.trim()
@@ -636,6 +811,8 @@ export default function ClientTournamentCardPublishV2Page() {
         setCardDate(d0 ? formatCardDateForDisplay(d0) : POSTCARD_TEMPLATE_APP_DEFAULTS.dateText);
         setCardPlace(loc0 ? venueNameOnly(loc0) : POSTCARD_TEMPLATE_APP_DEFAULTS.placeText);
         setCardTitleEffect("none");
+        setCardExtraLine1Effect("none");
+        setCardExtraLine2Effect("none");
         setCardTitleOutlineColor("black");
         setBottomBarColor("#ffffff");
         setBottomBarOpacity(1);
@@ -644,10 +821,19 @@ export default function ClientTournamentCardPublishV2Page() {
         setFooterDateTextColor("");
         setFooterPlaceTextColor("");
       }
+      }
     } catch {
       setMessage("카드 정보를 불러오는 중 오류가 발생했습니다.");
+    } finally {
+      editorInitialLoadDoneRef.current = true;
     }
   }, [tournamentId]);
+
+  const handleResetEditorToLastSaved = useCallback(() => {
+    if (!tournamentId.trim()) return;
+    clearCardPublishV2LocalDraft(tournamentId);
+    void loadSnapshots();
+  }, [tournamentId, loadSnapshots]);
 
   useEffect(() => {
     void loadSnapshots();
@@ -658,16 +844,6 @@ export default function ClientTournamentCardPublishV2Page() {
     prizeAutoSeededRef.current = false;
     setPublishIntent("recruiting");
   }, [tournamentId]);
-
-  useEffect(() => {
-    function onVisibility() {
-      if (document.visibilityState === "visible") {
-        void loadSnapshots();
-      }
-    }
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [loadSnapshots]);
 
   useEffect(() => {
     const activeRecruitingFlow =
@@ -712,6 +888,8 @@ export default function ClientTournamentCardPublishV2Page() {
       cardTextShadowEnabled,
       cardSurfaceLayout,
       cardTitleEffect,
+      cardExtraLine1Effect,
+      cardExtraLine2Effect,
       cardTitleOutlineColor,
       cardBottomBarColor: bottomBarColor,
       cardBottomBarOpacity: bottomBarOpacity,
@@ -730,6 +908,86 @@ export default function ClientTournamentCardPublishV2Page() {
     }
     return { ok: true, body };
   }
+
+  useEffect(() => {
+    if (!tournamentId.trim() || !editorInitialLoadDoneRef.current) return;
+    const key = cardPublishV2LocalDraftKey(tournamentId);
+    const baselineKey = cardEditorBaselineKeyRef.current;
+    const id = window.setTimeout(() => {
+      try {
+        const state = {
+          title,
+          textLine1,
+          textLine2,
+          cardDate,
+          cardPlace,
+          leadTextColor,
+          titleTextColor,
+          descriptionTextColor,
+          themeType,
+          mediaBackground,
+          imageOverlayOpacity,
+          v2MediaMode,
+          cardTitleEffect,
+          cardExtraLine1Effect,
+          cardExtraLine2Effect,
+          cardTitleOutlineColor,
+          bottomBarColor,
+          bottomBarOpacity,
+          gradientPreset,
+          gradientOpacity,
+          footerDateTextColor,
+          footerPlaceTextColor,
+          publishIntent,
+          editorTab,
+          textEffectApplyTarget,
+          userEditedTextLine2: userEditedTextLine2Ref.current,
+          uploadedImage: uploadedImage
+            ? {
+                imageId: uploadedImage.imageId,
+                w320Url: uploadedImage.w320Url,
+                w640Url: uploadedImage.w640Url,
+              }
+            : null,
+          captureImageSrc:
+            captureImageSrc.startsWith("blob:") || captureImageSrc.startsWith("data:") ? "" : captureImageSrc,
+        };
+        window.localStorage.setItem(key, JSON.stringify({ v: 1, baselineKey, state }));
+      } catch {
+        /* quota / private mode */
+      }
+    }, 280);
+    return () => window.clearTimeout(id);
+  }, [
+    tournamentId,
+    title,
+    textLine1,
+    textLine2,
+    cardDate,
+    cardPlace,
+    leadTextColor,
+    titleTextColor,
+    descriptionTextColor,
+    themeType,
+    mediaBackground,
+    imageOverlayOpacity,
+    v2MediaMode,
+    cardTitleEffect,
+    cardExtraLine1Effect,
+    cardExtraLine2Effect,
+    cardTitleOutlineColor,
+    bottomBarColor,
+    bottomBarOpacity,
+    gradientPreset,
+    gradientOpacity,
+    footerDateTextColor,
+    footerPlaceTextColor,
+    publishIntent,
+    editorTab,
+    textEffectApplyTarget,
+    uploadedImage,
+    captureImageSrc,
+  ]);
 
   /** 스냅샷 임시저장만 (`draftOnly: true`). 공개본은 덮어쓰지 않음. */
   async function persistCardDraftSnapshot(): Promise<boolean> {
@@ -860,6 +1118,7 @@ export default function ClientTournamentCardPublishV2Page() {
           setPublishBusy(false);
           return;
         }
+        clearCardPublishV2LocalDraft(tournamentId);
         setPublishCompleteModalOpen(true);
         setPublishFlow(null);
         setPublishFlowError("");
@@ -1076,10 +1335,13 @@ export default function ClientTournamentCardPublishV2Page() {
                       cardPlace={cardPlace}
                       setCardPlace={setCardPlace}
                       statusTextReadonly={(publishIntent === "recruiting" ? "모집중" : "임시저장").trim()}
-                      cardTitleEffect={cardTitleEffect}
-                      setCardTitleEffect={setCardTitleEffect}
+                      textEffectApplyTarget={textEffectApplyTarget}
+                      setTextEffectApplyTarget={setTextEffectApplyTarget}
+                      displayedCardTextEffect={displayedCardTextEffect}
+                      onPickCardTextEffect={onPickCardTextEffect}
                       cardTitleOutlineColor={cardTitleOutlineColor}
                       setCardTitleOutlineColor={setCardTitleOutlineColor}
+                      showOutlineSwatchesForTextEffect={showOutlineSwatchesForTextEffect}
                       disabled={editorLocked}
                     />
                   ) : (
@@ -1178,6 +1440,15 @@ export default function ClientTournamentCardPublishV2Page() {
                           {publishFlowError || "\u00a0"}
                         </p>
                       </div>
+                      <button
+                        type="button"
+                        className="v3-btn"
+                        style={{ borderStyle: "dashed" }}
+                        disabled={publishActionBlocked}
+                        onClick={() => handleResetEditorToLastSaved()}
+                      >
+                        마지막 저장 상태로 초기화
+                      </button>
                       <button
                         type="button"
                         className="v3-btn"

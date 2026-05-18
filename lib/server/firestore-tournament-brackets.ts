@@ -25,12 +25,15 @@ import {
   getUserById,
   normalizeBracket,
 } from "./platform-backing-store";
+import { emptyBracketPlayerSlot } from "../bracket-player-slot";
 import {
+  bracketMatchListHasAnyRealParticipant,
   collectAllPlayersFromBracket,
   findMutableMatchById,
   hasDownstreamRoundInSlice,
   normalizeRoundStatusesEverywhere,
   normalizeRoundStatusesInSlice,
+  pruneEmptyRoundsFromSliceInPlace,
   rebuildChainFromRoundInSlice,
   resolveRoundsForSliceKey,
   shuffleRoundSlotValuesInSlice,
@@ -1357,6 +1360,7 @@ export async function advanceBracketRoundFirestore(
         matches: nextMatches,
         status: "PENDING",
       });
+      pruneEmptyRoundsFromSliceInPlace(rounds);
       normalizeRoundStatusesEverywhere(bracketMut);
       syncFinalBlockFromQualifiersInPlace(bracketMut);
 
@@ -1380,13 +1384,6 @@ function matchWinnerPlayerOrNull(match: MutableBracketMatch): BracketPlayer | nu
   return { userId: wid, name: wnm };
 }
 
-function tbdPlayer(nextRoundNumber: number, pairIndex: number, slot: "player1" | "player2"): BracketPlayer {
-  return {
-    userId: `__TBD__:${nextRoundNumber}:${pairIndex}:${slot}`,
-    name: "TBD",
-  };
-}
-
 function buildNextRoundMatchesFromRound(params: {
   currentRound: MutableBracketRound;
   nextRoundNumber: number;
@@ -1405,12 +1402,15 @@ function buildNextRoundMatchesFromRound(params: {
     }
     nextMatches.push({
       id: randomUUID(),
-      player1: w1 ?? tbdPlayer(nextRoundNumber, i, "player1"),
-      player2: w2 ?? tbdPlayer(nextRoundNumber, i, "player2"),
+      player1: w1 ?? emptyBracketPlayerSlot(),
+      player2: w2 ?? emptyBracketPlayerSlot(),
       winnerUserId: null,
       winnerName: null,
       status: "PENDING",
     });
+  }
+  if (nextMatches.length > 0 && !bracketMatchListHasAnyRealParticipant(nextMatches)) {
+    return [];
   }
   return nextMatches;
 }
@@ -1468,6 +1468,7 @@ export async function resetBracketRoundsAfterFirestore(params: {
         throw new BracketOpReject("대상 라운드를 찾을 수 없습니다.");
       }
       truncateRoundsAfterInSlice(rounds, roundNumber);
+      pruneEmptyRoundsFromSliceInPlace(rounds);
       normalizeRoundStatusesEverywhere(mut);
       syncFinalBlockFromQualifiersInPlace(mut);
       const normalized = normalizeBracket(mut as Bracket);
@@ -1547,6 +1548,7 @@ export async function rebuildBracketRoundFirestore(params: {
         matches: nextMatches,
         status: "PENDING",
       });
+      pruneEmptyRoundsFromSliceInPlace(rounds);
       normalizeRoundStatusesEverywhere(mut);
       syncFinalBlockFromQualifiersInPlace(mut);
       const normalized = normalizeBracket(mut as Bracket);
@@ -1906,8 +1908,8 @@ function buildEmptyFinalRoundOneMatches(qualifierCount: number): BracketMatch[] 
   for (let i = 0; i < n; i += 2) {
     matches.push({
       id: randomUUID(),
-      player1: { userId: `__FIN_SLOT__:${i}`, name: "" },
-      player2: { userId: `__FIN_SLOT__:${i + 1}`, name: "" },
+      player1: emptyBracketPlayerSlot(),
+      player2: emptyBracketPlayerSlot(),
       winnerUserId: null,
       winnerName: null,
       status: "PENDING",
@@ -2072,6 +2074,10 @@ function resetQualifierBlockResultsInPlace(mut: MutableBracket, blockId: string)
     }
   }
   syncFinalBlockFromQualifiersInPlace(mut);
+  pruneEmptyRoundsFromSliceInPlace(rounds);
+  if (mut.finalBlock?.rounds?.length) {
+    pruneEmptyRoundsFromSliceInPlace(mut.finalBlock.rounds);
+  }
   normalizeRoundStatusesEverywhere(mut);
 }
 

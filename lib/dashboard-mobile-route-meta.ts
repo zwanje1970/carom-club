@@ -51,7 +51,7 @@ export function dashboardMobileChromeMeta(
       if (p.includes("/participants/") && p !== `${tbase}/participants`) {
         return { title: "참가자", backHref: `${tbase}/participants` };
       }
-      if (p.endsWith("/participants")) return { title: "참가자", backHref: tbase };
+      if (p.endsWith("/participants")) return { title: "신청자 관리", backHref: tbase };
       if (p.includes("/outline")) return { title: "개요", backHref: tbase };
       if (p.includes("/card-publish-v2")) return { title: "게시카드 편집기", backHref: tbase };
       if (p.includes("/card-publish")) return { title: "카드 발행", backHref: tbase };

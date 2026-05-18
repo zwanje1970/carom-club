@@ -822,6 +822,36 @@
   flex-shrink: 0;
 }
 
+.client-tournament-manage .client-tournament-manage__applicationsScreenName {
+  margin: 0 0 0.22rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #475569;
+  letter-spacing: -0.01em;
+}
+
+/* 세로 신청자 관리: 상단 크롬에 제목이 있을 때 본문 라벨 숨김(넓은 화면·데스크톱만 본문 라벨) */
+@media (max-width: 767px) {
+  main[data-client-applications-vertical-focus="1"]
+    .client-tournament-manage
+    .client-tournament-manage__applicationsScreenName {
+    display: none;
+  }
+}
+html[data-mobile-app-shell="1"]
+  main[data-client-applications-vertical-focus="1"]
+  .client-tournament-manage
+  .client-tournament-manage__applicationsScreenName {
+  display: none;
+}
+.app-dashboard-mobile-root[data-carom-app-client-force-mobile-shell="1"]
+  main[data-client-applications-vertical-focus="1"]
+  .client-tournament-manage
+  .client-tournament-manage__applicationsScreenName {
+  display: none;
+}
+
 .client-tournament-manage .client-tournament-manage__applicationsTitle {
   margin: 0 0 0.35rem;
   font-size: clamp(1.14rem, 4.4vw, 1.34rem);

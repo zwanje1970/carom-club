@@ -10,6 +10,7 @@ import {
   shuffleScopeForSlice,
   type BracketLike,
 } from "./bracket-view-server-sync";
+import { bracketSlotDisplayName } from "../../../../../lib/bracket-player-slot";
 
 export type BracketOfflineSegment = string;
 
@@ -168,9 +169,8 @@ export function appendOfflinePending(
   writeOfflinePending(tournamentId, seg, cur);
 }
 
-function slotLabel(p: { name: string; displayName?: string | null }): string {
-  const d = typeof p.displayName === "string" ? p.displayName.trim() : "";
-  return d || p.name;
+function slotLabel(p: { userId: string; name: string; displayName?: string | null }): string {
+  return bracketSlotDisplayName(p);
 }
 
 function cloneBracket<T>(b: T): T {

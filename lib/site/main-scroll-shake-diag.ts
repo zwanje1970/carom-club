@@ -117,7 +117,7 @@ export function logMainScrollShakeDiag(payload: Record<string, unknown>): void {
   if (serializable !== null) {
     appendStoredShakeDiagLog(serializable);
   }
-  console.info("[main-shake-diag]", slim);
+  console.info("[main-shake-diag]", JSON.stringify(slim));
 }
 
 /** 매 프레임 호출: 래핑·큰 점프·스로틀 시에만 로그 */
