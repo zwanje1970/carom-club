@@ -7,13 +7,9 @@ import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
 import deckShellStyles from "./main-site-scroll-tournament-deck-shell.module.css";
 import {
-  getMainPreloadElapsedMs,
-  isMainScrollDeckImageVisible,
-  logMainCardImage,
-  logMainCardImageDecodeRequestCount,
-  logMainCardImageDecodedCount,
-  markMainCardImageDiagAnchor,
-} from "../../lib/site/main-card-image-preload-diag";
+  clearMainScrollDeckImageDecodeCacheForUrl,
+  decodeMainScrollDeckImageOnce,
+} from "../../lib/site/main-scroll-deck-image-decode";
 import { isMainSiteLoadDiagEnabled, logMainSiteLoadDiag } from "../../lib/site/main-site-load-diag";
 import {
   isMainScrollShakeDiagEnabled,
@@ -77,92 +73,34 @@ const MAIN_SHAKE_DIAG_COPY_BUTTON_STYLE: CSSProperties = {
   boxShadow: "0 2px 8px rgba(0,0,0,0.28)",
 };
 
-function tryDecodeMainScrollDeckImage(img: HTMLImageElement) {
-  if (typeof img.decode !== "function") return;
-  const src = (img.currentSrc || img.src || "").trim();
-  if (src) logMainCardImageDecodeRequestCount(src);
-  void img
-    .decode()
-    .then(() => {
-      if (src) logMainCardImageDecodedCount(src);
-    })
-    .catch(() => {});
-}
-
-type MainScrollDeckKickStats = {
-  foundImages: number;
-  reloadedImages: number;
-  decodedImages: number;
-};
-
-function mergeMainScrollDeckKickStats(
-  a: MainScrollDeckKickStats,
-  b: MainScrollDeckKickStats,
-): MainScrollDeckKickStats {
-  return {
-    foundImages: Math.max(a.foundImages, b.foundImages),
-    reloadedImages: a.reloadedImages + b.reloadedImages,
-    decodedImages: a.decodedImages + b.decodedImages,
-  };
-}
-
 /** 홈 복귀·스크롤 복원 후 lazy img가 뷰포트에 남는 WebView 표시 누락 보정 — 뷰포트 내 img만 */
-function kickVisibleMainScrollDeckImages(viewport: HTMLElement): MainScrollDeckKickStats {
+function kickVisibleMainScrollDeckImages(viewport: HTMLElement): void {
   const vRect = viewport.getBoundingClientRect();
   const imgs = viewport.querySelectorAll<HTMLImageElement>(`img.${styles.sampleMainCardPosterPublishedSnapshot}`);
-  let foundImages = 0;
-  let reloadedImages = 0;
-  let decodedImages = 0;
   for (const img of imgs) {
     const r = img.getBoundingClientRect();
     if (r.bottom < vRect.top - 8 || r.top > vRect.bottom + 8) continue;
     const src = (img.currentSrc || img.src || "").trim();
     if (!src) continue;
-    foundImages++;
     img.dataset.forceVisible = "1";
     const needsReload = !img.complete || img.naturalWidth <= 0;
     if (needsReload) {
+      clearMainScrollDeckImageDecodeCacheForUrl(src);
       img.loading = "eager";
       img.src = src;
-      reloadedImages++;
     }
-    tryDecodeMainScrollDeckImage(img);
-    decodedImages++;
+    decodeMainScrollDeckImageOnce(img);
     requestAnimationFrame(() => {
-      tryDecodeMainScrollDeckImage(img);
+      decodeMainScrollDeckImageOnce(img);
     });
   }
-  if (isMainSiteLoadDiagEnabled()) {
-    logMainCardImage("kick-visible-images", {
-      foundImages,
-      reloadedImages,
-      decodedImages,
-    });
-  }
-  return { foundImages, reloadedImages, decodedImages };
 }
 
 /** 즉시 1회 + rAF 1회 — WebView lazy 재감지 */
-function scheduleKickVisibleMainScrollDeckImages(
-  viewport: HTMLElement,
-  options?: { kickContext?: "pageshow" | "session-restore" },
-) {
-  const kickContext = options?.kickContext;
-  if (kickContext === "pageshow") {
-    logMainCardImage("pageshow-kick-start", {});
-    markMainCardImageDiagAnchor();
-  } else if (kickContext === "session-restore") {
-    logMainCardImage("session-restore-kick-start", {});
-    markMainCardImageDiagAnchor();
-  }
-  const stats1 = kickVisibleMainScrollDeckImages(viewport);
+function scheduleKickVisibleMainScrollDeckImages(viewport: HTMLElement) {
+  kickVisibleMainScrollDeckImages(viewport);
   requestAnimationFrame(() => {
-    const stats2 = kickVisibleMainScrollDeckImages(viewport);
-    if (kickContext === "pageshow") {
-      logMainCardImage("pageshow-kick-done", mergeMainScrollDeckKickStats(stats1, stats2));
-    } else if (kickContext === "session-restore") {
-      logMainCardImage("session-restore-kick-done", mergeMainScrollDeckKickStats(stats1, stats2));
-    }
+    kickVisibleMainScrollDeckImages(viewport);
   });
 }
 
@@ -258,96 +196,24 @@ function cardSlotClassNames(base: string, selected: boolean, selectedMod?: strin
   return [base, selected && selectedMod, selected && "card-selected"].filter(Boolean).join(" ");
 }
 
-function useMainScrollDeckImageDiag(itemId: string, imageUrl: string) {
+function useMainScrollDeckImageRef(imageUrl: string) {
   const imgRef = useRef<HTMLImageElement>(null);
-  const srcAssignedRef = useRef(false);
-  const loadLoggedRef = useRef(false);
-  const mountedLoggedRef = useRef(false);
 
-  useLayoutEffect(() => {
-    if (!imageUrl.trim() || !isMainSiteLoadDiagEnabled() || mountedLoggedRef.current) return;
+  const onImageLoad = useCallback(() => {
     const img = imgRef.current;
-    if (!img) return;
-    mountedLoggedRef.current = true;
-    logMainCardImage("main-img-mounted", {
-      id: itemId,
-      url: imageUrl,
-      elapsedMs: getMainPreloadElapsedMs(),
-    });
-  }, [itemId, imageUrl]);
-
-  useLayoutEffect(() => {
-    if (!imageUrl.trim() || srcAssignedRef.current || !isMainSiteLoadDiagEnabled()) return;
-    srcAssignedRef.current = true;
-    logMainCardImage("main-img-src-set", {
-      id: itemId,
-      url: imageUrl,
-      elapsedMs: getMainPreloadElapsedMs(),
-    });
-  }, [itemId, imageUrl]);
-
-  const logLoadedDecodedVisible = useCallback(() => {
-    if (!isMainSiteLoadDiagEnabled() || loadLoggedRef.current) return;
-    loadLoggedRef.current = true;
-    const url = imageUrl.trim();
-    logMainCardImage("main-img-loaded", {
-      id: itemId,
-      url,
-      elapsedMs: getMainPreloadElapsedMs(),
-    });
-    const img = imgRef.current;
-    if (!img) return;
-    const afterDecode = () => {
-      logMainCardImageDecodedCount(url);
-      logMainCardImage("main-img-decoded", {
-        id: itemId,
-        url,
-        elapsedMs: getMainPreloadElapsedMs(),
-      });
-      requestAnimationFrame(() => {
-        const node = imgRef.current;
-        if (node && isMainScrollDeckImageVisible(node)) {
-          logMainCardImage("main-img-visible", {
-            id: itemId,
-            url,
-            elapsedMs: getMainPreloadElapsedMs(),
-          });
-        }
-      });
-    };
-    logMainCardImageDecodeRequestCount(url);
-    logMainCardImage("main-img-decode-start", {
-      id: itemId,
-      url,
-      elapsedMs: getMainPreloadElapsedMs(),
-    });
-    if (typeof img.decode === "function") {
-      void img
-        .decode()
-        .then(afterDecode)
-        .catch((e: unknown) => {
-          logMainCardImage("main-img-decode-error", {
-            id: itemId,
-            url,
-            error: e instanceof Error ? e.message : String(e),
-            elapsedMs: getMainPreloadElapsedMs(),
-          });
-          afterDecode();
-        });
-    } else {
-      afterDecode();
-    }
-  }, [itemId, imageUrl]);
+    if (!img || !imageUrl.trim()) return;
+    decodeMainScrollDeckImageOnce(img);
+  }, [imageUrl]);
 
   useLayoutEffect(() => {
     const img = imgRef.current;
-    if (!img || !imageUrl.trim() || !isMainSiteLoadDiagEnabled()) return;
+    if (!img || !imageUrl.trim()) return;
     if (img.complete && img.naturalWidth > 0) {
-      logLoadedDecodedVisible();
+      decodeMainScrollDeckImageOnce(img);
     }
-  }, [imageUrl, logLoadedDecodedVisible]);
+  }, [imageUrl]);
 
-  return { imgRef, onDiagLoad: logLoadedDecodedVisible };
+  return { imgRef, onImageLoad };
 }
 
 const MainSiteCardRow = memo(function MainSiteCardRow({
@@ -374,7 +240,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   const deckImgUrl = item.imageUrl?.trim() ?? "";
   /** PNG 면: URL 있으면 placeholder 플래그와 무관하게 실제 이미지 카드 */
   const renderAsPngDeck = Boolean(deckImgUrl);
-  const { imgRef, onDiagLoad } = useMainScrollDeckImageDiag(item.id, deckImgUrl);
+  const { imgRef, onImageLoad } = useMainScrollDeckImageRef(deckImgUrl);
 
   const slotShellProps = {
     className: cardSlotClassNames(styles.sampleMainCardSlot, selected, styles.sampleMainCardSlotSelected),
@@ -457,7 +323,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                               ? { fetchPriority: "auto" as const }
                               : {})}
                           onLoad={() => {
-                            onDiagLoad();
+                            onImageLoad();
                             if (lcpHeroImage) onLcpHeroImageLoad?.();
                           }}
                           onError={() => {
@@ -577,7 +443,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     if (typeof window === "undefined") return;
     const onPageShow = (_ev: PageTransitionEvent) => {
       const viewport = viewportRef.current;
-      if (viewport) scheduleKickVisibleMainScrollDeckImages(viewport, { kickContext: "pageshow" });
+      if (viewport) scheduleKickVisibleMainScrollDeckImages(viewport);
     };
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
@@ -589,7 +455,6 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   useEffect(() => {
     if (!isMainSiteLoadDiagEnabled() || mountLoggedRef.current) return;
     mountLoggedRef.current = true;
-    markMainCardImageDiagAnchor();
     const first = items[lcpHeroItemIndex >= 0 ? lcpHeroItemIndex : 0];
     logMainSiteLoadDiag("client-scroll", "MainSiteScrollCards mounted", {
       itemCount: items.length,
@@ -598,18 +463,6 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       firstCardId: first?.id ?? null,
     });
   }, [items, lcpHeroItemIndex]);
-
-  useEffect(() => {
-    if (!isMainSiteLoadDiagEnabled() || renderItems.length === 0) return;
-    const withImageCount = renderItems.filter((it) => Boolean(it.imageUrl?.trim())).length;
-    const eagerIndexes = new Set(initialPriorityIndexes);
-    if (lcpHeroItemIndex >= 0) eagerIndexes.add(lcpHeroItemIndex);
-    logMainCardImage("load-target-count", {
-      visibleOrNearCount: eagerIndexes.size,
-      totalRenderedCount: withImageCount * 2,
-      totalDeckItems: items.length,
-    });
-  }, [items.length, renderItems, initialPriorityIndexes, lcpHeroItemIndex]);
 
   const onLcpHeroImageLoad = useCallback(() => {
     if (!isMainSiteLoadDiagEnabled() || lcpHeroLoadLoggedRef.current) return;
@@ -705,7 +558,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     };
 
     apply();
-    scheduleKickVisibleMainScrollDeckImages(viewport, { kickContext: "session-restore" });
+    scheduleKickVisibleMainScrollDeckImages(viewport);
     let rafOuter: number | null = requestAnimationFrame(() => {
       rafOuter = null;
       apply();
