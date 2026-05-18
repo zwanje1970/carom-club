@@ -36,7 +36,11 @@ const MAIN_SHAKE_DIAG_COMPACT_KEYS = [
   "cardTop",
   "rawDtSec",
   "fixedDeltaTotal",
+  "dtDeltaTotal",
   "carryDisabled",
+  "estimatedRefreshRate",
+  "isHighRefreshRateDevice",
+  "imageCurrentSrc",
 ] as const;
 
 export function compactMainScrollShakeDiagPayload(

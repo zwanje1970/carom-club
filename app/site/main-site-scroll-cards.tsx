@@ -1012,11 +1012,13 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       const useTransformDiag = isMainScrollUseTransformDiagEnabled();
       const rawDtSec = dtSec;
       const rawDeltaTotal = pxPerSec * rawDtSec + carryBefore;
-      /** transform 검증: RAF dtSec 변동 대신 고정 프레임 간격으로 이동량 계산 */
-      const fixedFrameSec = 1 / 60;
-      const fixedMove = pxPerSec / 60;
-      const fixedDeltaTotal = useTransformDiag ? fixedMove : pxPerSec * fixedFrameSec + carryBefore;
-      const deltaTotal = useTransformDiag ? fixedMove : rawDeltaTotal;
+      /** transform 검증: 실제 RAF dt 기준 이동(120Hz에서 60fps 고정량 매 프레임 적용 방지) */
+      const nominal60fpsMove = pxPerSec / 60;
+      const dtDeltaTotal = pxPerSec * rawDtSec;
+      const estimatedRefreshRate =
+        rawDtSec > 0.0005 ? Math.round(1 / rawDtSec) : null;
+      const isHighRefreshRateDevice = rawDtSec > 0.0005 && rawDtSec < 1 / 75;
+      const deltaTotal = useTransformDiag ? dtDeltaTotal : rawDeltaTotal;
       scrollPixelCarryRef.current = useTransformDiag ? 0 : deltaTotal % 1;
       const currentScrollValue = useTransformDiag ? mainScrollVirtualOffsetRef.current : node.scrollTop;
       let nextScrollTop = currentScrollValue + deltaTotal;
@@ -1044,6 +1046,12 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         const transformValue =
           trackEl && typeof getComputedStyle !== "undefined" ? getComputedStyle(trackEl).transform : "(none)";
         const cardEl = primarySegmentRef.current?.querySelector(`[${SITE_SCROLL_CARD}]`) as HTMLElement | null;
+        const imgEl = primarySegmentRef.current?.querySelector(
+          "img[data-site-scroll-deck-img]",
+        ) as HTMLImageElement | null;
+        const imageCurrentSrc = imgEl
+          ? (imgEl.currentSrc || imgEl.src || "").slice(0, 120)
+          : null;
         const rect = cardEl?.getBoundingClientRect();
         const cardTop = rect ? rect.top : null;
         const prevTop = mainShakePrevCardTopRef.current;
@@ -1070,10 +1078,14 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             transformOffset: useTransformDiag ? Number(appliedScrollTop.toFixed(3)) : null,
             ...(useTransformDiag
               ? {
-                  scrollMotionTimingMode: "fixed-60fps",
+                  scrollMotionTimingMode: "dt-based",
                   rawDtSec,
-                  fixedDeltaTotal,
+                  fixedDeltaTotal: nominal60fpsMove,
+                  dtDeltaTotal,
                   carryDisabled: true,
+                  estimatedRefreshRate,
+                  isHighRefreshRateDevice,
+                  imageCurrentSrc,
                 }
               : {}),
           },
