@@ -572,23 +572,6 @@ export default function ClientTournamentEditPage() {
     };
   }, [posterObjectPreviewUrl]);
 
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
-    if (!posterObjectPreviewUrl && !posterImageUrl) return;
-    const normalized =
-      posterImageUrl.trim() !== "" ? normalizePosterImageSrcForPreview(posterImageUrl) : "";
-    const src =
-      posterObjectPreviewUrl && !posterVisibleUsesServerUrl
-        ? posterObjectPreviewUrl
-        : normalized || posterObjectPreviewUrl || "";
-    // eslint-disable-next-line no-console -- 화면에 쓰는 최종 미리보기 src 점검용
-    console.log("[poster preview] display src", src, {
-      blob: Boolean(posterObjectPreviewUrl),
-      server: posterImageUrl || null,
-      visibleUsesServer: posterVisibleUsesServerUrl,
-    });
-  }, [posterObjectPreviewUrl, posterImageUrl, posterVisibleUsesServerUrl]);
-
   function hasUnsavedDraft(): boolean {
     if (!editId) return false;
     if (editLoading || editBaselineJsonRef.current === null) return false;
@@ -756,11 +739,6 @@ export default function ClientTournamentEditPage() {
     const w640 = typeof data.w640Url === "string" ? data.w640Url.trim() : "";
     const w320 = typeof data.w320Url === "string" ? data.w320Url.trim() : "";
     const nextUrl = w640 || w320;
-
-    if (process.env.NODE_ENV === "development") {
-      // eslint-disable-next-line no-console -- 포스터 미리보기 URL 점검용
-      console.log("[poster upload] urls", { w640, w320, chosen: nextUrl });
-    }
 
     if (res.ok && nextUrl) {
       setPosterImageUrl(normalizePosterImageSrcForPreview(nextUrl));

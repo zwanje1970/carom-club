@@ -62,9 +62,7 @@ export default function ClientApplyPage() {
   const annualVisible = snapshot?.annualMembershipVisible === true;
 
   const runSubmit = useCallback(async () => {
-    console.log("[client-apply] submit called", { inFlight: submittingRef.current, loading });
     if (submittingRef.current) {
-      console.log("[client-apply] submit skipped: already in flight");
       return;
     }
     submittingRef.current = true;
@@ -82,7 +80,6 @@ export default function ClientApplyPage() {
         return;
       }
 
-      console.log("[client-apply] POST /api/client-application");
       const response = await fetch("/api/client-application", {
         method: "POST",
         credentials: "include",

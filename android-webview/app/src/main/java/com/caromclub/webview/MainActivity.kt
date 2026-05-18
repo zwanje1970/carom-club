@@ -21,7 +21,6 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Base64
@@ -56,32 +55,6 @@ import kotlin.math.roundToInt
 import org.json.JSONObject
 
 private const val ORIENTATION_BRIDGE_TAG = "CaromAppBridge"
-
-/**
- * WebView 내 「떨림 로그 복사」 DOM/URL 확인용 — Logcat 태그 [CaromShakeDiagProbe].
- * 원인 확인 후 **반드시 false로 두거나 코드 제거**할 것(임시 진단).
- * `/site` 지연 프로브(`shakeSiteProbeHandler`·`evalShakeSiteDelayedDomProbe` 등) 포함 **전부 삭제 대상**.
- */
-private const val SHAKE_DIAG_WEB_PROBE_ENABLED = true
-
-private const val SHAKE_DIAG_PROBE_TAG = "CaromShakeDiagProbe"
-
-/** `https://carom.club/site`(쿼리·해시·끝 슬래시 허용)일 때만 지연 프로브 시리즈 실행 */
-private fun isHttpsCaromClubSitePublicUrl(url: String?): Boolean {
-    if (url.isNullOrBlank()) return false
-    return try {
-        val uri = Uri.parse(url.trim())
-        val scheme = uri.scheme?.lowercase(Locale.getDefault()) ?: return false
-        if (scheme != "https") return false
-        val host = uri.host?.lowercase(Locale.getDefault()) ?: return false
-        if (host != "carom.club") return false
-        val rawPath = uri.path ?: return false
-        val path = if (rawPath.length > 1 && rawPath.endsWith("/")) rawPath.dropLast(1) else rawPath
-        path == "/site"
-    } catch (_: Exception) {
-        false
-    }
-}
 
 /**
  * 로컬 단말 검증 전용: `true`이면 앱 시작 직후 landscape 고정(전체 앱이 가로가 됨).
@@ -136,13 +109,6 @@ class MainActivity : AppCompatActivity() {
     /** 스플래시 유지: 첫 페이지 로드 + 최소 2초 */
     private val splashPageReady = AtomicBoolean(false)
     private var splashMinEndElapsedRealtime: Long = 0L
-
-    /** [SHAKE_DIAG_WEB_PROBE_ENABLED] `doUpdateVisitedHistory` 스로틀 */
-    private var lastShakeDiagWebProbeAtElapsed: Long = 0L
-
-    /** [SHAKE_DIAG_WEB_PROBE_ENABLED] `/site` 지연 DOM 프로브 — 확인 후 제거 */
-    private val shakeSiteProbeHandler = Handler(Looper.getMainLooper())
-    private val shakeSiteProbeRunnables = mutableListOf<Runnable>()
 
     private val locationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -286,142 +252,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun evalShakeDiagWebProbe(
-        view: WebView,
-        reason: String,
-        argUrl: String?,
-        throttleMinMs: Long,
-    ) {
-        if (!SHAKE_DIAG_WEB_PROBE_ENABLED) return
-        val now = SystemClock.elapsedRealtime()
-        if (throttleMinMs > 0 && now - lastShakeDiagWebProbeAtElapsed < throttleMinMs) return
-        lastShakeDiagWebProbeAtElapsed = now
-        val js =
-            """
-            (function(){
-              try {
-                var el = document.querySelector('[aria-label="떨림 로그 복사"]');
-                var r = el ? el.getBoundingClientRect() : null;
-                return JSON.stringify({
-                  href: location.href,
-                  readyState: document.readyState,
-                  includesText: !!(document.body && document.body.innerHTML.indexOf('떨림 로그 복사') >= 0),
-                  hasButton: !!el,
-                  rect: r ? { left: r.left, top: r.top, width: r.width, height: r.height, bottom: r.bottom, right: r.right } : null
-                });
-              } catch (e) {
-                return JSON.stringify({ error: String(e && e.message ? e.message : e) });
-              }
-            })();
-            """.trimIndent()
-        view.evaluateJavascript(js) { value: String? ->
-            Log.i(
-                SHAKE_DIAG_PROBE_TAG,
-                "$reason argUrl=$argUrl webView.url=${view.url} probeJson=$value",
-            )
-        }
-    }
-
-    private fun cancelShakeSiteDelayedProbes() {
-        for (r in shakeSiteProbeRunnables) {
-            shakeSiteProbeHandler.removeCallbacks(r)
-        }
-        shakeSiteProbeRunnables.clear()
-    }
-
-    private fun evalShakeSiteDelayedDomProbe(
-        view: WebView,
-        probeLabel: String,
-    ) {
-        if (!SHAKE_DIAG_WEB_PROBE_ENABLED) return
-        val quotedLabel = JSONObject.quote(probeLabel)
-        val js =
-            """
-            (function(){
-              try {
-                var probeLabel = $quotedLabel;
-                var href = location.href;
-                var u;
-                try { u = new URL(href); } catch (e0) {
-                  return JSON.stringify({
-                    probeLabel: probeLabel,
-                    href: href,
-                    error: "invalid-location-href"
-                  });
-                }
-                var host = (u.hostname || "").toLowerCase();
-                var pathRaw = u.pathname || "";
-                var path = (pathRaw.length > 1 && pathRaw.endsWith("/")) ? pathRaw.slice(0, -1) : pathRaw;
-                if (u.protocol !== "https:" || host !== "carom.club" || path !== "/site") {
-                  return JSON.stringify({
-                    probeLabel: probeLabel,
-                    skip: true,
-                    href: href,
-                    host: host,
-                    path: path
-                  });
-                }
-                var el = document.querySelector('[aria-label="떨림 로그 복사"]');
-                var r = el ? el.getBoundingClientRect() : null;
-                var body = document.body;
-                var vp = document.querySelector('[data-site-main-scroll-viewport="1"]');
-                var cards = document.querySelectorAll('[data-site-scroll-card]');
-                return JSON.stringify({
-                  probeLabel: probeLabel,
-                  href: href,
-                  readyState: document.readyState,
-                  includesText: !!(body && body.innerHTML.indexOf('떨림 로그 복사') >= 0),
-                  hasButton: !!el,
-                  rect: r ? { left: r.left, top: r.top, width: r.width, height: r.height, bottom: r.bottom, right: r.right } : null,
-                  bodyInnerHTMLLength: body ? body.innerHTML.length : 0,
-                  hasMainScrollViewport: !!vp,
-                  scrollCardCount: cards ? cards.length : 0
-                });
-              } catch (e) {
-                return JSON.stringify({
-                  probeLabel: $quotedLabel,
-                  error: String(e && e.message ? e.message : e)
-                });
-              }
-            })();
-            """.trimIndent()
-        view.evaluateJavascript(js) { value: String? ->
-            Log.i(SHAKE_DIAG_PROBE_TAG, "probeLabel=$probeLabel webView.url=${view.url} probeJson=$value")
-        }
-    }
-
-    private fun scheduleShakeSiteProbeSeriesIfApplicable(
-        view: WebView,
-        triggerUrl: String?,
-    ) {
-        if (!SHAKE_DIAG_WEB_PROBE_ENABLED) return
-        val u = triggerUrl ?: view.url
-        if (!isHttpsCaromClubSitePublicUrl(u) && !isHttpsCaromClubSitePublicUrl(view.url)) return
-        cancelShakeSiteDelayedProbes()
-        val steps =
-            listOf(
-                "site-immediate" to 0L,
-                "site-1000ms" to 1000L,
-                "site-3000ms" to 3000L,
-                "site-5000ms" to 5000L,
-            )
-        for ((label, delayMs) in steps) {
-            val runnable =
-                Runnable {
-                    if (!SHAKE_DIAG_WEB_PROBE_ENABLED || isFinishing || !this@MainActivity::webView.isInitialized) {
-                        return@Runnable
-                    }
-                    evalShakeSiteDelayedDomProbe(webView, label)
-                }
-            shakeSiteProbeRunnables.add(runnable)
-            shakeSiteProbeHandler.postDelayed(runnable, delayMs)
-        }
-        Log.i(
-            SHAKE_DIAG_PROBE_TAG,
-            "shakeSiteProbeSeries scheduled triggerUrl=$triggerUrl view.url=${view.url} steps=${steps.size}",
-        )
-    }
-
     private fun setupWebView() {
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
@@ -473,15 +303,6 @@ class MainActivity : AppCompatActivity() {
 
         webView.webViewClient =
             object : WebViewClient() {
-                override fun onPageStarted(
-                    view: WebView?,
-                    url: String?,
-                    favicon: Bitmap?,
-                ) {
-                    super.onPageStarted(view, url, favicon)
-                    this@MainActivity.cancelShakeSiteDelayedProbes()
-                }
-
                 override fun shouldOverrideUrlLoading(
                     view: WebView?,
                     request: WebResourceRequest?
@@ -494,32 +315,10 @@ class MainActivity : AppCompatActivity() {
                     return false
                 }
 
-                /** 클라이언트 라우팅(`router.push`) 등으로 `onPageFinished`가 다시 안 올 때 URL/DOM 확인용 */
-                override fun doUpdateVisitedHistory(
-                    view: WebView?,
-                    url: String?,
-                    isReload: Boolean,
-                ) {
-                    super.doUpdateVisitedHistory(view, url, isReload)
-                    if (view != null) {
-                        this@MainActivity.evalShakeDiagWebProbe(
-                            view,
-                            "doUpdateVisitedHistory(isReload=$isReload)",
-                            url,
-                            throttleMinMs = 450L,
-                        )
-                        this@MainActivity.scheduleShakeSiteProbeSeriesIfApplicable(view, url)
-                    }
-                }
-
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     splashPageReady.set(true)
                     FcmRegister.postTokenToServer(this@MainActivity, BuildConfig.SITE_BASE_URL)
-                    if (view != null) {
-                        this@MainActivity.evalShakeDiagWebProbe(view, "onPageFinished", url, throttleMinMs = 0L)
-                        this@MainActivity.scheduleShakeSiteProbeSeriesIfApplicable(view, url)
-                    }
                 }
             }
 
@@ -727,7 +526,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        cancelShakeSiteDelayedProbes()
         if (this::webView.isInitialized) {
             webView.removeAllViews()
             webView.destroy()

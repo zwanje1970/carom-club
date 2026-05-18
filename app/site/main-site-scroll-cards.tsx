@@ -26,18 +26,6 @@ function isMainScrollUseTransformDiagEnabled(): boolean {
   return process.env.NEXT_PUBLIC_MAIN_SCROLL_USE_TRANSFORM_DIAG === "1";
 }
 
-/**
- * [임시 진단 테스트] transform 진단 경로에서 CSS translate3d만 정수 적용.
- * 비교 끝나면 `false`로 원복. (Vercel `NEXT_PUBLIC_MAIN_SCROLL_ROUND_TRANSFORM_DIAG` 불필요)
- */
-const FORCE_ROUND_TRANSFORM_IN_TRANSFORM_DIAG = true;
-
-/** transform 진단 전용 — 정수 transform vs 소수 transformOffset 비교 */
-function isMainScrollRoundTransformDiagEnabled(): boolean {
-  if (!isMainScrollUseTransformDiagEnabled()) return false;
-  return FORCE_ROUND_TRANSFORM_IN_TRANSFORM_DIAG;
-}
-
 function resolveMainScrollTransformCssOffset(virtualOffsetPx: number): {
   transformOffset: number;
   transformRoundedOffset: number;
@@ -46,9 +34,12 @@ function resolveMainScrollTransformCssOffset(virtualOffsetPx: number): {
 } {
   const transformOffset = Number(virtualOffsetPx.toFixed(3));
   const transformRoundedOffset = Math.round(virtualOffsetPx);
-  const useRoundedTransform = isMainScrollRoundTransformDiagEnabled();
-  const appliedTransformOffset = useRoundedTransform ? transformRoundedOffset : transformOffset;
-  return { transformOffset, transformRoundedOffset, useRoundedTransform, appliedTransformOffset };
+  return {
+    transformOffset,
+    transformRoundedOffset,
+    useRoundedTransform: false,
+    appliedTransformOffset: transformOffset,
+  };
 }
 
 function applyMainScrollTrackTransformDiag(track: HTMLElement | null, appliedTransformOffsetPx: number): void {
@@ -83,22 +74,6 @@ const MAIN_SHAKE_DIAG_COPY_BUTTON_STYLE: CSSProperties = {
   boxShadow: "0 2px 8px rgba(0,0,0,0.28)",
 };
 
-function logMainCardReturnDiag(payload: Record<string, unknown>) {
-  const args: unknown[] = ["[main-card-return-diag]"];
-  for (const key of Object.keys(payload)) {
-    const value = payload[key];
-    if (Array.isArray(value)) {
-      args.push(`${key}Len=`, value.length);
-      continue;
-    }
-    if (value !== null && typeof value === "object") {
-      continue;
-    }
-    args.push(`${key}=`, value);
-  }
-  console.info(...args);
-}
-
 function tryDecodeMainScrollDeckImage(img: HTMLImageElement) {
   if (typeof img.decode !== "function") return;
   void img.decode().catch(() => {});
@@ -128,11 +103,6 @@ function kickVisibleMainScrollDeckImages(viewport: HTMLElement) {
       tryDecodeMainScrollDeckImage(img);
     });
   }
-  logMainCardReturnDiag({
-    phase: "kick-visible-images",
-    foundImages,
-    reloadedImages,
-  });
 }
 
 /** 즉시 1회 + rAF 1회 — WebView lazy 재감지 */
@@ -520,58 +490,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   renderItemsRef.current = renderItems;
 
   useEffect(() => {
-    const path = typeof window !== "undefined" ? window.location.pathname : "";
-    logMainCardReturnDiag({ phase: "scroll-cards-mount", path, itemsLen: items.length, itemsIdsKey });
-    return () => {
-      logMainCardReturnDiag({
-        phase: "scroll-cards-unmount",
-        path: typeof window !== "undefined" ? window.location.pathname : "",
-        itemsLen: itemsRef.current.length,
-        itemsIdsKey: itemsRef.current.length > 0 ? mainScrollIdsKey(itemsRef.current) : "",
-      });
-    };
-  }, []);
-
-  useEffect(() => {
-    const path = typeof window !== "undefined" ? window.location.pathname : "";
-    const sample = items.slice(0, 4).map((it) => ({
-      id: it.id,
-      titleLen: (it.title ?? "").length,
-      hasImageUrl: Boolean(it.imageUrl?.trim()),
-      placeholder: Boolean(it.slideDeckPngPlaceholder),
-      pngFace: Boolean(it.slideDeckPngFace),
-    }));
-    logMainCardReturnDiag({
-      phase: "scroll-cards-items",
-      path,
-      itemsLen: items.length,
-      itemsIdsKey,
-      sample,
-    });
-    for (let i = 0; i < Math.min(5, items.length); i++) {
-      const it = items[i]!;
-      const deckImgUrlExists = Boolean(it.imageUrl?.trim());
-      logMainCardReturnDiag({
-        phase: "render-card-sample",
-        sampleIndex: i,
-        deckImgUrlExists,
-        slideDeckPngPlaceholder: Boolean(it.slideDeckPngPlaceholder),
-        renderAsPngDeck: deckImgUrlExists,
-        renderAsPlaceholder: !deckImgUrlExists,
-      });
-    }
-  }, [items, itemsIdsKey]);
-
-  useEffect(() => {
     if (typeof window === "undefined") return;
     const onPageShow = (ev: PageTransitionEvent) => {
-      logMainCardReturnDiag({
-        phase: "window-pageshow",
-        persisted: ev.persisted,
-        path: window.location.pathname,
-        itemsLen: itemsRef.current.length,
-        itemsIdsKey: itemsRef.current.length > 0 ? mainScrollIdsKey(itemsRef.current) : "",
-      });
       const viewport = viewportRef.current;
       if (viewport) scheduleKickVisibleMainScrollDeckImages(viewport);
     };
@@ -629,13 +549,6 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
     if (items.length === 0 || !itemsIdsKey) {
-      logMainCardReturnDiag({
-        phase: "session-restore-skip",
-        reason: items.length === 0 ? "empty-items" : "empty-ids-key",
-        path: typeof window !== "undefined" ? window.location.pathname : "",
-        itemsLen: items.length,
-        itemsIdsKey,
-      });
       return;
     }
     const viewport = viewportRef.current;
@@ -672,28 +585,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       parsed = null;
     }
     if (!parsed) {
-      logMainCardReturnDiag({
-        phase: "session-restore-skip",
-        reason: "no-parseable-session",
-        path: typeof window !== "undefined" ? window.location.pathname : "",
-        itemsLen: items.length,
-        itemsIdsKey,
-      });
       return;
     }
-
-    const idsMatch = parsed.idsKey === itemsIdsKey;
-    logMainCardReturnDiag({
-      phase: "session-restore-apply",
-      path: typeof window !== "undefined" ? window.location.pathname : "",
-      itemsLen: items.length,
-      itemsIdsKey,
-      storedIdsKeyLen: parsed.idsKey.length,
-      idsMatch,
-      scrollTopStored: parsed.scrollTop,
-      progressRatioStored: "progressRatio" in parsed ? parsed.progressRatio : null,
-      storageV: parsed.v,
-    });
 
     sessionRestoreAppliedRef.current = true;
     const settleUntil = performance.now() + 900;
@@ -841,14 +734,6 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     }
     let cancelled = false;
     const delayMs = sessionRestoreAppliedRef.current ? 900 : 220;
-    logMainCardReturnDiag({
-      phase: "auto-slide-ready-schedule",
-      path: typeof window !== "undefined" ? window.location.pathname : "",
-      delayMs,
-      sessionRestoreApplied: sessionRestoreAppliedRef.current,
-      itemsLen: items.length,
-      itemsIdsKey,
-    });
     const timer = window.setTimeout(() => {
       if (!cancelled) setAutoSlideReady(true);
     }, delayMs);
@@ -910,14 +795,6 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       mainShakeRafStartedAtRef.current = null;
     }
 
-    logMainCardReturnDiag({
-      phase: "marquee-raf-effect-start",
-      path: typeof window !== "undefined" ? window.location.pathname : "",
-      itemsLen: items.length,
-      itemsIdsKey,
-      slideCardMoveSpeedLevel,
-      autoSlideReady,
-    });
 
     const speedLevel = Number.isFinite(slideCardMoveSpeedLevel)
       ? Math.min(10, Math.max(1, Math.round(slideCardMoveSpeedLevel)))
@@ -1199,15 +1076,6 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             progressRatio: Math.min(1, Math.max(0, scrollTopForStorage / maxScroll)),
           };
           sessionStorage.setItem(MAIN_SITE_SCROLL_STORAGE_KEY, JSON.stringify(payload));
-          logMainCardReturnDiag({
-            phase: "marquee-raf-effect-cleanup-save-session",
-            path: typeof window !== "undefined" ? window.location.pathname : "",
-            idsKeyLen: payload.idsKey.length,
-            scrollTop: payload.scrollTop,
-            progressRatio: payload.progressRatio,
-            scrollHeight: node.scrollHeight,
-            clientHeight: node.clientHeight,
-          });
         }
       } catch {
         /* 저장 공간 부족 등 */
