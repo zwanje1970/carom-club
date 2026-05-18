@@ -567,6 +567,7 @@
   box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
+  white-space: pre-wrap;
 }
 
 .fieldTextarea.fieldTextareaDesc2 {
@@ -575,6 +576,7 @@
   max-height: 12rem;
   line-height: 1.35;
   box-sizing: border-box;
+  white-space: pre-wrap;
 }
 
 .fieldFile {

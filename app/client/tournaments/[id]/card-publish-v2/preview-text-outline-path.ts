@@ -244,6 +244,25 @@ export async function withCardPreviewTextPathLayer(args: {
     hiddenNodes.push({ node, prevVisibility: node.style.visibility });
     node.style.visibility = "hidden";
   });
+
+  const editorFont = cardRoot.dataset.cardEditorFont === "1";
+  const layeredTitleEffect = cardRoot.dataset.layeredTitleEffect;
+  if (
+    editorFont &&
+    (layeredTitleEffect === "outline" || layeredTitleEffect === "shadow_outline")
+  ) {
+    const fillEl = cardRoot.querySelector<HTMLElement>("[data-title-css-fill=\"1\"]");
+    const strokeEl = cardRoot.querySelector<HTMLElement>("[data-title-css-stroke=\"1\"]");
+    if (fillEl) {
+      hiddenNodes.push({ node: fillEl, prevVisibility: fillEl.style.visibility });
+      fillEl.style.visibility = "hidden";
+    }
+    if (layeredTitleEffect === "outline" && strokeEl) {
+      hiddenNodes.push({ node: strokeEl, prevVisibility: strokeEl.style.visibility });
+      strokeEl.style.visibility = "hidden";
+    }
+  }
+
   const notHidden = textNodes
     .map((node) => {
       const style = window.getComputedStyle(node);

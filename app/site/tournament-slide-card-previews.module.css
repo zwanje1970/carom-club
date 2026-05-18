@@ -1005,7 +1005,7 @@ article[data-editor-card-preview="1"] .frameTitle:not(.cardTitleWithLayeredOutli
   -webkit-line-clamp: 3;
   overflow: hidden;
   word-break: break-word;
-  white-space: normal;
+  white-space: pre-wrap;
 }
 
 article[data-editor-card-preview="1"] .cardTitleWithLayeredOutline .titleLayerWrap {
@@ -1014,7 +1014,7 @@ article[data-editor-card-preview="1"] .cardTitleWithLayeredOutline .titleLayerWr
   -webkit-line-clamp: 3;
   overflow: hidden;
   word-break: break-word;
-  white-space: normal;
+  white-space: pre-wrap;
 }
 
 article[data-editor-card-preview="1"] .classicLead,
@@ -1032,7 +1032,8 @@ article[data-editor-card-preview="1"] .frameDesc {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  white-space: normal;
+  white-space: pre-wrap;
+  margin-top: -1px;
 }
 
 article[data-editor-card-preview="1"] .classicDescSecondary,
@@ -1233,6 +1234,11 @@ article[data-card-editor-font="1"] .titleOutlineSvgProbe {
   font-family: CaromCardEditorPretendard, ui-sans-serif, system-ui, sans-serif;
   font-weight: var(--ce-title-weight, 700) !important;
   font-synthesis: none;
+}
+
+/* 편집기 v2 + 외곽선만: CSS stroke 할로 숨김 — 미리보기는 fill 한 겹, 외곽선은 캡처 시 SVG path */
+.cardRoot[data-card-editor-font="1"][data-layered-title-effect="outline"] :global([data-title-css-stroke="1"]) {
+  visibility: hidden;
 }
 
 /* 게시 PNG(html2canvas): 글자 glyph만 숨김 — 배경·띠·배지 원·레이아웃 wrapper에는 적용하지 않음 */

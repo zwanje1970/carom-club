@@ -521,6 +521,8 @@ export type TournamentApplication = {
 /** 클라이언트 참가자 목록 RSC — 증빙·OCR 등 제외(입금자명은 목록 표시용으로 포함) */
 export type TournamentApplicationListItem = {
   id: string;
+  /** 목록·출석-대진 연동용(경량 select에 포함) */
+  userId?: string;
   applicantName: string;
   phone: string;
   depositorName?: string | null;
@@ -589,6 +591,12 @@ export type BracketMatch = {
   winnerName: string | null;
   status: BracketMatchStatus;
   quickResultDetail?: BracketQuickResultDetail | null;
+  /**
+   * 빠른결과 선수교체 복구용: 해당 슬롯을 처음 바꿀 때의 참가자(대진표 문서에만 저장).
+   * 신청·확정 원본은 변경하지 않습니다.
+   */
+  substitutionBackupPlayer1?: BracketPlayer | null;
+  substitutionBackupPlayer2?: BracketPlayer | null;
 };
 
 export type BracketRound = {
@@ -636,6 +644,8 @@ export type Bracket = {
    * 전체 화면 출력 등에서 원본 단일 트리 복원에 사용한다.
    */
   preSplitRootRounds?: BracketRound[];
+  /** 출석 확인「대진표 자동반영」— 표시용 기록만(자동 대진 수정 없음). */
+  attendanceAutoReflect?: boolean;
 };
 
 export type BracketDraftMatchInput = {
@@ -7962,6 +7972,182 @@ export async function replaceBracketMatchPlayer(params: {
       previousPlayerName: previousPlayer.name,
       replacementPlayerUserId: replacement.userId,
       replacementPlayerName: replacement.name,
+    },
+  });
+
+  await writeLocalJsonAggregate(store);
+  return { ok: true, bracket: normalizeBracket(latestBracket as Bracket) };
+}
+
+function cloneBracketPlayerForSubstituteLocal(p: BracketPlayer): BracketPlayer {
+  const out: BracketPlayer = {
+    userId: p.userId.trim(),
+    name: typeof p.name === "string" ? p.name : "",
+  };
+  if (p.displayName !== undefined && p.displayName !== null && String(p.displayName).trim() !== "") {
+    out.displayName = String(p.displayName).trim();
+  }
+  return out;
+}
+
+function findMutableMatchInLocalBracket(
+  bracket: MutableBracket,
+  matchId: string,
+): {
+  sliceRounds: MutableBracketRound[];
+  targetRound: MutableBracketRound;
+  targetMatch: MutableBracketMatch;
+} | null {
+  const id = matchId.trim();
+  if (!id) return null;
+  const scan = (rounds: MutableBracketRound[]) => {
+    for (const round of rounds) {
+      const m = round.matches.find((item) => item.id === id);
+      if (m) return { sliceRounds: rounds, targetRound: round, targetMatch: m };
+    }
+    return null;
+  };
+  if (
+    (bracket.bracketMode === "multi_block" || (Array.isArray(bracket.blocks) && bracket.blocks.length > 0)) &&
+    Array.isArray(bracket.blocks) &&
+    bracket.blocks.length > 0
+  ) {
+    for (const block of bracket.blocks) {
+      const hit = scan(block.rounds ?? []);
+      if (hit) return hit;
+    }
+    if (bracket.finalBlock?.rounds?.length) {
+      const hit = scan(bracket.finalBlock.rounds);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  return scan(bracket.rounds ?? []);
+}
+
+/** 빠른결과 선수교체(대진표 문서만). 승패·상세기록은 변경하지 않습니다. */
+export async function substituteBracketMatchPlayer(params: {
+  tournamentId: string;
+  matchId: string;
+  slot: "player1" | "player2";
+  mode: "member" | "guest" | "restore";
+  memberUserId?: string | null;
+  guestName?: string | null;
+  actorUserId?: string;
+  bracketZoneId?: string | null;
+}): Promise<{ ok: true; bracket: Bracket } | { ok: false; error: string }> {
+  if (isFirestoreUsersBackendConfigured()) {
+    return (await import("./firestore-tournament-brackets")).substituteBracketMatchPlayerFirestore(params);
+  }
+  const tournamentId = params.tournamentId.trim();
+  const matchId = params.matchId.trim();
+  if (!tournamentId || !matchId) {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+  if (params.slot !== "player1" && params.slot !== "player2") {
+    return { ok: false, error: "잘못된 요청입니다." };
+  }
+
+  const store = await readLocalJsonAggregate();
+  const tournament = store.tournaments.find((item) => item.id === tournamentId);
+  if (!tournament) {
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
+  }
+  const latestBracket = store.brackets
+    .filter((item) => item.tournamentId === tournamentId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] as MutableBracket | undefined;
+  if (!latestBracket) {
+    return { ok: false, error: "확정 대진표가 없습니다." };
+  }
+
+  applyBracketDefaultsInPlace(latestBracket);
+
+  const found = findMutableMatchInLocalBracket(latestBracket, matchId);
+  if (!found) {
+    return { ok: false, error: "대상 매치를 찾을 수 없습니다." };
+  }
+  const { sliceRounds, targetRound, targetMatch } = found;
+  if (sliceRounds.some((round) => round.roundNumber === targetRound.roundNumber + 1)) {
+    return { ok: false, error: "다음 라운드가 이미 생성되어 참가자를 교체할 수 없습니다." };
+  }
+
+  const oppositeUserId =
+    params.slot === "player1" ? targetMatch.player2.userId.trim() : targetMatch.player1.userId.trim();
+
+  if (params.mode === "restore") {
+    const backupKey = params.slot === "player1" ? "substitutionBackupPlayer1" : "substitutionBackupPlayer2";
+    const backup =
+      params.slot === "player1" ? targetMatch.substitutionBackupPlayer1 : targetMatch.substitutionBackupPlayer2;
+    if (!backup || !backup.userId?.trim()) {
+      return { ok: false, error: "복구할 원래 선수 정보가 없습니다." };
+    }
+    const restored = cloneBracketPlayerForSubstituteLocal(backup);
+    if (restored.userId === oppositeUserId) {
+      return { ok: false, error: "동일 매치 내 중복 참가자는 허용되지 않습니다." };
+    }
+    if (params.slot === "player1") {
+      targetMatch.player1 = restored;
+      delete (targetMatch as Record<string, unknown>)[backupKey];
+    } else {
+      targetMatch.player2 = restored;
+      delete (targetMatch as Record<string, unknown>)[backupKey];
+    }
+  } else {
+    let nextPlayer: BracketPlayer | null = null;
+    if (params.mode === "member") {
+      const mid = (params.memberUserId ?? "").trim();
+      if (!mid) {
+        return { ok: false, error: "회원 ID를 입력해 주세요." };
+      }
+      if (mid === oppositeUserId) {
+        return { ok: false, error: "동일 매치 내 중복 참가자는 허용되지 않습니다." };
+      }
+      const u = await getUserById(mid);
+      if (!u) {
+        return { ok: false, error: "회원을 찾을 수 없습니다." };
+      }
+      const nm = (u.name?.trim() || u.nickname?.trim() || "").trim() || "이름 없음";
+      nextPlayer = { userId: u.id.trim(), name: nm };
+    } else if (params.mode === "guest") {
+      const rawName = typeof params.guestName === "string" ? params.guestName.trim() : "";
+      if (!rawName) {
+        return { ok: false, error: "이름을 입력해 주세요." };
+      }
+      nextPlayer = { userId: `manual-participant:${randomUUID()}`, name: rawName };
+    }
+    if (!nextPlayer?.userId?.trim()) {
+      return { ok: false, error: "잘못된 요청입니다." };
+    }
+    if (nextPlayer.userId === oppositeUserId) {
+      return { ok: false, error: "동일 매치 내 중복 참가자는 허용되지 않습니다." };
+    }
+
+    const current = params.slot === "player1" ? targetMatch.player1 : targetMatch.player2;
+    if (params.slot === "player1") {
+      if (!targetMatch.substitutionBackupPlayer1?.userId?.trim()) {
+        (targetMatch as MutableBracketMatch).substitutionBackupPlayer1 = cloneBracketPlayerForSubstituteLocal(current);
+      }
+      targetMatch.player1 = nextPlayer;
+    } else {
+      if (!targetMatch.substitutionBackupPlayer2?.userId?.trim()) {
+        (targetMatch as MutableBracketMatch).substitutionBackupPlayer2 = cloneBracketPlayerForSubstituteLocal(current);
+      }
+      targetMatch.player2 = nextPlayer;
+    }
+  }
+
+  applyBracketDefaultsInPlace(latestBracket);
+
+  appendAuditLogSafe(store, {
+    actorUserId: params.actorUserId,
+    actionType: "MATCH_PLAYER_SUBSTITUTED",
+    targetType: "match",
+    targetId: matchId,
+    meta: {
+      tournamentId,
+      roundNumber: targetRound.roundNumber,
+      slot: params.slot,
+      mode: params.mode,
     },
   });
 

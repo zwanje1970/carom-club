@@ -12,6 +12,7 @@
 }
 
 .dialog {
+  position: relative;
   width: 100%;
   max-width: 26rem;
   background: #fff;
@@ -215,4 +216,214 @@
 .saveBtn {
   min-height: 40px;
   font-weight: 600;
+}
+
+.substitutePill {
+  flex-shrink: 0;
+  min-height: 22px;
+  padding: 0.06rem 0.32rem;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: #64748b;
+  background: transparent;
+  border: 1px solid rgba(100, 116, 139, 0.45);
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.substitutePill:hover:not(:disabled) {
+  color: #334155;
+  border-color: rgba(51, 65, 85, 0.45);
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.substitutePill:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.substPanel {
+  margin: 0 0 0.55rem;
+  padding: 0.55rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #f8fafc;
+  font-size: 0.8rem;
+}
+
+.substPanelTitle {
+  margin: 0 0 0.45rem;
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.82rem;
+}
+
+.substMenuRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.substMenuBtn {
+  min-height: 32px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1e293b;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.substMenuBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.substMenuBtnCancel {
+  min-height: 32px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #64748b;
+  background: #fff;
+  border: 1px dashed rgba(100, 116, 139, 0.5);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.substMenuBtnCancel:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.substIntentText {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.substCancelBtn {
+  min-height: 30px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.76rem;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.memberSearch {
+  width: 100%;
+  min-height: 34px;
+  margin-bottom: 0.4rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  box-sizing: border-box;
+}
+
+.memberList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 11rem;
+  overflow-y: auto;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.memberListItem {
+  width: 100%;
+  text-align: left;
+  padding: 0.42rem 0.45rem;
+  border: none;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.memberListItem:last-child {
+  border-bottom: none;
+}
+
+.memberListItem:hover {
+  background: #f1f5f9;
+}
+
+.memberName {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.memberMeta {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.guestInput {
+  width: 100%;
+  min-height: 36px;
+  margin-bottom: 0.45rem;
+  padding: 0.28rem 0.4rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  box-sizing: border-box;
+}
+
+.substRowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.warnOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  background: rgba(15, 23, 42, 0.35);
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.warnBox {
+  width: 100%;
+  max-width: 18rem;
+  padding: 0.75rem 0.65rem;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  text-align: center;
+}
+
+.warnBox p {
+  margin: 0 0 0.65rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.warnConfirm {
+  min-height: 38px;
+  padding: 0.25rem 0.85rem;
+  font-weight: 700;
+  font-size: 0.82rem;
 }

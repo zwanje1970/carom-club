@@ -21,6 +21,7 @@ const COLLECTION = "v3_tournament_applications";
 
 const TOURNAMENT_APPLICATION_LIST_FIRESTORE_FIELDS = [
   "createdAt",
+  "userId",
   "applicantName",
   "phone",
   "depositorName",
@@ -144,8 +145,12 @@ function tournamentApplicationToListItem(
   const clientApplicationCancelledAt =
     typeof cac === "string" && cac.trim() !== "" ? cac.trim() : cac === null ? null : undefined;
 
+  const userIdRaw = item.userId;
+  const userId = typeof userIdRaw === "string" && userIdRaw.trim() !== "" ? userIdRaw.trim() : undefined;
+
   return {
     id,
+    ...(userId ? { userId } : {}),
     applicantName: typeof item.applicantName === "string" ? item.applicantName : "",
     phone: typeof item.phone === "string" ? item.phone : "",
     ...(depositorName ? { depositorName } : {}),

@@ -54,11 +54,19 @@ export function countPendingOperatorApplicationApproval(entries: TournamentAppli
   }).length;
 }
 
+/**
+ * 확정리스트(참가 확정자) — Firestore `status === "APPROVED"`인 건만.
+ * 운영 화면의 신청 승인(`clientApplicationApprovedAt`)·입금확인만으로는 포함하지 않습니다.
+ */
+export function filterConfirmedParticipantEntries<T extends { status: string }>(entries: readonly T[]): T[] {
+  return entries.filter((e) => e.status === "APPROVED");
+}
+
 export function filterParticipantEntries(
   entries: TournamentApplicationListItem[],
   key: ClientParticipantFilterKey
 ): TournamentApplicationListItem[] {
-  if (key === "approved") return entries.filter((e) => e.status === "APPROVED");
+  if (key === "approved") return filterConfirmedParticipantEntries(entries);
   if (key === "wait") return entries.filter(isApplicantBucket);
   if (key === "reject") return entries.filter((e) => isProcessingCancelledEntry(e) || e.status === "REJECTED");
   return entries;
@@ -67,7 +75,7 @@ export function filterParticipantEntries(
 export function countParticipantApplications(entries: TournamentApplicationListItem[]) {
   return {
     all: entries.length,
-    approved: entries.filter((e) => e.status === "APPROVED").length,
+    approved: filterConfirmedParticipantEntries(entries).length,
     wait: entries.filter(isApplicantBucket).length,
     reject: countApplicationCancelledChip(entries),
   };

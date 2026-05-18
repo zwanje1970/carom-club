@@ -426,6 +426,7 @@ function TournamentSlideCardPreview({
         data-tournament-card-capture-root="1"
         data-editor-card-preview={editorPreviewFixedLayout && !artboardPx ? "1" : undefined}
         data-card-editor-font={cardEditorTypography ? "1" : undefined}
+        data-layered-title-effect={useLayeredTitleOutline ? titleEffect : undefined}
         style={editorFontVars}
       >
         <MediaStack
@@ -466,11 +467,12 @@ function TournamentSlideCardPreview({
                     {useLayeredTitleOutline ? (
                       <>
                         <span className={styles.titleLayerWrap}>
-                          <span className={styles.titleLayerStroke} aria-hidden>
+                          <span className={styles.titleLayerStroke} data-title-css-stroke="1" aria-hidden>
                             {titleDisplay}
                           </span>
                           <span
                             className={styles.titleLayerFill}
+                            data-title-css-fill="1"
                             style={titleColor ? { color: titleColor } : undefined}
                           >
                             {titleDisplay}
@@ -527,6 +529,7 @@ function TournamentSlideCardPreview({
         data-tournament-card-capture-root="1"
         data-editor-card-preview={editorPreviewFixedLayout && !artboardPx ? "1" : undefined}
         data-card-editor-font={cardEditorTypography ? "1" : undefined}
+        data-layered-title-effect={useLayeredTitleOutline ? titleEffect : undefined}
         style={editorFontVars}
       >
         <MediaStack
@@ -566,11 +569,12 @@ function TournamentSlideCardPreview({
                   {useLayeredTitleOutline ? (
                     <>
                       <span className={styles.titleLayerWrap}>
-                        <span className={styles.titleLayerStroke} aria-hidden>
+                        <span className={styles.titleLayerStroke} data-title-css-stroke="1" aria-hidden>
                           {titleDisplay}
                         </span>
                         <span
                           className={styles.titleLayerFill}
+                          data-title-css-fill="1"
                           style={titleColor ? { color: titleColor } : undefined}
                         >
                           {titleDisplay}

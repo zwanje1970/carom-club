@@ -115,6 +115,17 @@ function readRawSlotPlayer(
   return (internalIndex % 2 === 0 ? match.player1 : match.player2) as BoardPlayerSlot;
 }
 
+/** 통합 보기(mergeSectionIndex)일 때 슬롯이 속한 원본 브래킷 조각 */
+function bracketInputForBoardItem(
+  item: Pick<PositionedBoardMatch, "mergeSectionIndex">,
+  rootBracket: BracketBoardInput,
+  mergedStacks: Array<{ bracket: BracketBoardInput }> | null | undefined,
+): BracketBoardInput {
+  const si = item.mergeSectionIndex;
+  if (typeof si === "number" && mergedStacks?.[si]?.bracket) return mergedStacks[si]!.bracket;
+  return rootBracket;
+}
+
 /** 승/패 색상용 — placeholder·부전승 더미 id 제외 */
 function slotUserIdForHighlight(raw: BoardPlayerSlot | null): string {
   if (!raw) return "";
@@ -529,6 +540,8 @@ export default function InteractiveBracketBoard({
   connectivityHint = "",
   onExit,
   bracketPdfSnapshotRef,
+  attendanceBracketAutoReflect = false,
+  attendanceCheckedUserIds = null,
 }: {
   bracket: BracketBoardInput;
   tournamentTitle?: string;
@@ -582,6 +595,10 @@ export default function InteractiveBracketBoard({
   saveStateText?: string;
   /** 현재 화면 bracket·viewMode·로컬 승자 선택 스냅샷 — PDF 출력 등 */
   bracketPdfSnapshotRef?: React.MutableRefObject<(() => BracketBoardPdfSnapshot) | null>;
+  /** 출석「대진표 자동반영」ON일 때만 적용(이름·슬롯 유지, 자동 대진 수정 없음) */
+  attendanceBracketAutoReflect?: boolean;
+  /** 출석 체크된 참가자 userId 집합(목록 API 기준) */
+  attendanceCheckedUserIds?: ReadonlySet<string> | null;
 }) {
   void bracketViewNotice;
   void connectivityHint;
@@ -616,17 +633,22 @@ export default function InteractiveBracketBoard({
   } | null>(null);
   const [winnerByPair, setWinnerByPair] = useState<Record<string, WinnerChoice>>({});
 
+  useEffect(() => {
+    if (chromeMode !== "bracketView") return;
+    setWinnerByPair({});
+  }, [chromeMode, bracket]);
+
   useLayoutEffect(() => {
     if (!bracketPdfSnapshotRef) return;
     bracketPdfSnapshotRef.current = () => ({
       bracket,
       boardViewMode: viewMode === "dual" ? "dual" : viewMode === "horizontal" ? "horizontal" : "vertical",
-      winnerByPairSnapshot: { ...winnerByPair },
+      winnerByPairSnapshot: chromeMode === "bracketView" ? {} : { ...winnerByPair },
     });
     return () => {
       bracketPdfSnapshotRef.current = null;
     };
-  }, [bracket, bracketPdfSnapshotRef, viewMode, winnerByPair]);
+  }, [bracket, bracketPdfSnapshotRef, chromeMode, viewMode, winnerByPair]);
   const [scale, setScale] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
@@ -1112,13 +1134,15 @@ export default function InteractiveBracketBoard({
   const activeLayout = layoutComputed;
 
   const derived = useMemo(() => {
+    const winnerByPairForDerive: Record<string, WinnerChoice> =
+      chromeMode === "bracketView" ? {} : winnerByPair;
     const items = activeLayout.positionedMatches;
     const hasMerge = items.some((it) => typeof it.mergeSectionIndex === "number");
     if (!hasMerge) {
       return computeDerivedVisualState({
         positionedMatches: items,
         bracketSource: bracket,
-        winnerByPair,
+        winnerByPair: winnerByPairForDerive,
         connectorKeyPrefix: "",
       });
     }
@@ -1142,7 +1166,7 @@ export default function InteractiveBracketBoard({
       const d = computeDerivedVisualState({
         positionedMatches: subset,
         bracketSource: src,
-        winnerByPair,
+        winnerByPair: winnerByPairForDerive,
         connectorKeyPrefix: `m${si}|`,
       });
       for (const [k, v] of d.labelByItemKey) mergedLabel.set(k, v);
@@ -1160,7 +1184,7 @@ export default function InteractiveBracketBoard({
       activeConnectorKeys: mergedActive,
       chosenByPair: mergedChosen,
     };
-  }, [activeLayout.positionedMatches, bracket, winnerByPair, bracketViewMergedStacks]);
+  }, [activeLayout.positionedMatches, bracket, winnerByPair, bracketViewMergedStacks, chromeMode]);
 
   const handleWinnerPick = useCallback(
     (args: {
@@ -2096,14 +2120,24 @@ export default function InteractiveBracketBoard({
               {activeLayout.positionedMatches.map((item) => {
                 const slotWinner = derived.winnerByItemKey.get(item.key) === true;
                 const slotLoser = derived.loserByItemKey.get(item.key) === true;
-                const rawSlot = readRawSlotPlayer(bracket, item.roundIndex, item.internalIndex);
+                const slotBracket = bracketInputForBoardItem(item, bracket, bracketViewMergedStacks ?? undefined);
+                const rawSlot = readRawSlotPlayer(slotBracket, item.roundIndex, item.internalIndex);
                 const highlightUid = slotUserIdForHighlight(rawSlot);
                 const pickUserIdForApi = highlightUid && rawSlot ? rawSlot.userId.trim() : "";
                 const boxKey = `${item.match.id}:${item.internalIndex}`;
-                const slotLabel = derived.labelByItemKey.get(item.key) ?? "";
+                const derivedSlotLabel = derived.labelByItemKey.get(item.key) ?? "";
+                const slotLabel =
+                  chromeMode === "bracketView"
+                    ? (rawSlot ? bracketSlotLabel(rawSlot) : "").trim() || derivedSlotLabel
+                    : derivedSlotLabel;
                 const slotHasName = slotLabel.trim() !== "";
                 const opponentHasName = derived.opponentHasNameByItemKey.get(item.key) === true;
                 const playerSlot: "player1" | "player2" = item.internalIndex % 2 === 0 ? "player1" : "player2";
+                const suppressNameHighlight =
+                  attendanceBracketAutoReflect === true &&
+                  attendanceCheckedUserIds != null &&
+                  Boolean(highlightUid) &&
+                  !attendanceCheckedUserIds.has(highlightUid);
                 const origName = (rawSlot?.name ?? "").trim();
                 const dispName = (rawSlot?.displayName ?? "").trim();
                 const showRenameBadge = dispName.length > 0 && dispName !== origName;
@@ -2128,7 +2162,7 @@ export default function InteractiveBracketBoard({
                         bracketViewSlotInteractionLocked ? styles.bracketViewSlotPassThrough : "",
                         selectedBoxKey === boxKey ? styles.playerSelected : "",
                         swapCandidate?.key === boxKey ? styles.playerSwapCandidate : "",
-                        slotHasName && !slotLoser ? styles.playerHasName : "",
+                        slotHasName && !slotLoser && !suppressNameHighlight ? styles.playerHasName : "",
                         slotWinner && !slotLoser ? styles.playerWinner : "",
                         slotLoser ? styles.playerLoser : "",
                         slotWinner && !slotLoser ? "board-player-winner" : "",
@@ -2216,7 +2250,7 @@ export default function InteractiveBracketBoard({
                               const payload = editing;
                               setRenameEditing(null);
                               if (!payload) return;
-                              const rawPlayer = readRawSlotPlayer(bracket, payload.roundIndex, payload.internalIndex);
+                              const rawPlayer = readRawSlotPlayer(slotBracket, payload.roundIndex, payload.internalIndex);
                               const next = payload.value.trim();
                               const resolved = resolveRenameDisplayPayload(rawPlayer, slotLabel, next);
                               if (resolved === null) return;
@@ -2236,7 +2270,7 @@ export default function InteractiveBracketBoard({
                               const payload = editing;
                               setRenameEditing(null);
                               if (!payload) return;
-                              const rawPlayer = readRawSlotPlayer(bracket, payload.roundIndex, payload.internalIndex);
+                              const rawPlayer = readRawSlotPlayer(slotBracket, payload.roundIndex, payload.internalIndex);
                               const next = payload.value.trim();
                               const resolved = resolveRenameDisplayPayload(rawPlayer, slotLabel, next);
                               if (resolved === null) return;

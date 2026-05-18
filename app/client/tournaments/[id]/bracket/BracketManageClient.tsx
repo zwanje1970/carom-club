@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type ReactElement, type ReactNode, type SetStateAction } from "react";
 
 import {
   findBracketMatchLocation as findBracketMatchLocationForSync,
@@ -38,6 +38,7 @@ import BracketProgressSummaryCard from "./BracketProgressSummaryCard";
 import TournamentTvLinkBlock from "../TournamentTvLinkBlock";
 import "../tournament-manage-ui.css";
 import { fetchClientBracketMetaJson } from "./bracket-client-poll-meta";
+import { getShuffleRoundBlockedReason } from "../../../../../lib/bracket-shuffle-guards";
 
 const TournamentGroupRound1PrintClient = dynamic(
   () => import("./TournamentGroupRound1PrintClient"),
@@ -489,6 +490,39 @@ function bracketSlotLabel(p: { name: string; displayName?: string | null }): str
   return d || p.name;
 }
 
+function bracketRoundHasRecordedResult(r: BracketRoundDoc): boolean {
+  for (const m of r.matches) {
+    if (m.status === "COMPLETED") return true;
+    const w = typeof m.winnerUserId === "string" ? m.winnerUserId.trim() : "";
+    if (w !== "" && !w.startsWith("__")) return true;
+  }
+  return false;
+}
+
+function quickBracketRoundShuffleBlockedReason(sliceRounds: BracketRoundDoc[], round: BracketRoundDoc): string | null {
+  if (bracketRoundHasRecordedResult(round)) return "이미 결과가 입력된 라운드는 재섞기할 수 없습니다.";
+  return getShuffleRoundBlockedReason(sliceRounds, round.roundNumber);
+}
+
+/** 빠른 결과: 카드 제목 (참가 규모·조·라운드 기준, 고정 64강 가정 없음) */
+function quickResultsRoundCardTitle(bracket: Bracket, boardSliceKey: string | null, round: BracketRoundDoc): string {
+  const matches = round.matches?.length ?? 0;
+  const size = Math.max(2, matches * 2);
+  const idx = String(round.roundNumber).padStart(2, "0");
+  if (boardSliceKey === "final") {
+    if (matches === 1) return "결승";
+    if (matches === 2 && size <= 4) return "준결승";
+    return `결선 ${size}강`;
+  }
+  if (boardSliceKey?.startsWith("block:")) {
+    const bid = boardSliceKey.slice("block:".length);
+    const bl = bracket.blocks?.find((b) => b.id === bid);
+    const lab = typeof bl?.label === "string" && bl.label.trim() !== "" ? bl.label.trim() : bid;
+    return `${size}강-${lab}-${idx}경기`;
+  }
+  return `${size}강 ${idx}경기`;
+}
+
 /** 조분할 입력값 문자열 → 숫자 (미입력·숫자 아님은 null). 실행 시점 검증용. */
 function parseMultiBlockSplitSizeDraft(draft: string): number | null {
   const t = draft.trim();
@@ -514,9 +548,284 @@ type BracketHubModalState =
       type: "shuffleRegenConfirm";
       roundNumber: number;
       scope: ReturnType<typeof shuffleScopeForSlice>;
+      shuffleUi?: "hub" | "quickCard";
     }
   | { type: "shuffleRegenSuccess" }
   | { type: "participantsRequired" };
+
+function BracketHubModalLayer({
+  bracketHubModal,
+  setBracketHubModal,
+  multiBlockBusy,
+  confirmShuffleRegenAndPost,
+  confirmSplitCancelAndPost,
+  loadLatestBracket,
+  tournamentId,
+  routerRefresh,
+  routerPush,
+}: {
+  bracketHubModal: BracketHubModalState;
+  setBracketHubModal: Dispatch<SetStateAction<BracketHubModalState>>;
+  multiBlockBusy: boolean;
+  confirmShuffleRegenAndPost: (
+    roundNumber: number,
+    scope: ReturnType<typeof shuffleScopeForSlice>,
+  ) => Promise<void>;
+  confirmSplitCancelAndPost: () => Promise<void>;
+  loadLatestBracket: () => Promise<void>;
+  tournamentId: string;
+  routerRefresh: () => void;
+  routerPush: (href: string) => void;
+}): ReactElement | null {
+  if (!bracketHubModal) return null;
+  return (
+    <div
+      role="presentation"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 402,
+        background: "rgba(15,23,42,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding:
+          "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, var(--client-bottom-space, 80px)) max(16px, env(safe-area-inset-left))",
+        boxSizing: "border-box",
+      }}
+      onClick={() => {
+        if (multiBlockBusy) return;
+        if (bracketHubModal.type === "shuffleRegenConfirm" || bracketHubModal.type === "participantsRequired") {
+          setBracketHubModal(null);
+        }
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={
+          bracketHubModal.type === "participantsRequired" ? "bracket-hub-participants-required-title" : undefined
+        }
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: "22rem",
+          background: "#fff",
+          borderRadius: "12px",
+          padding: "1.15rem",
+          border: "1px solid #cbd5e1",
+          boxShadow: "none",
+          boxSizing: "border-box",
+        }}
+      >
+        {bracketHubModal.type === "splitCancelConfirm" ? (
+          <>
+            <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>조 분할 취소</h2>
+            <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+              분할을 취소하면 단일 대진표로 돌아갑니다. 대진 순서와 상대는 그대로 유지됩니다. 계속하시겠습니까?
+            </p>
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="v3-btn"
+                disabled={multiBlockBusy}
+                onClick={() => setBracketHubModal(null)}
+                style={{ minHeight: 44 }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={multiBlockBusy}
+                onClick={() => void confirmSplitCancelAndPost()}
+                style={{
+                  minHeight: 44,
+                  padding: "0.5rem 1rem",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#2563eb",
+                  color: "#fff",
+                  fontWeight: 700,
+                }}
+              >
+                {multiBlockBusy ? "처리 중…" : "확인"}
+              </button>
+            </div>
+          </>
+        ) : null}
+        {bracketHubModal.type === "shuffleRegenConfirm" ? (
+          <>
+            <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>
+              {bracketHubModal.shuffleUi === "quickCard" ? "대진 재생성" : "대진표 생성/재생성"}
+            </h2>
+            <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+              {bracketHubModal.shuffleUi === "quickCard"
+                ? "이 라운드에 배치된 참가자만 무작위로 다시 섞습니다. 다른 라운드·다른 조에는 영향이 없습니다. 계속하시겠습니까?"
+                : "대진표가 재생성되면 기존 대진은 되돌릴 수 없습니다. 계속하시겠습니까?"}
+            </p>
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="v3-btn"
+                disabled={multiBlockBusy}
+                onClick={() => setBracketHubModal(null)}
+                style={{ minHeight: 44 }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={multiBlockBusy}
+                onClick={() =>
+                  void confirmShuffleRegenAndPost(bracketHubModal.roundNumber, bracketHubModal.scope)
+                }
+                style={{
+                  minHeight: 44,
+                  padding: "0.5rem 1rem",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#d97706",
+                  color: "#fff",
+                  fontWeight: 700,
+                }}
+              >
+                {multiBlockBusy ? "처리 중…" : "확인"}
+              </button>
+            </div>
+          </>
+        ) : null}
+        {bracketHubModal.type === "splitCancelSuccess" ? (
+          <>
+            <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>조 분할 취소</h2>
+            <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+              분할이 취소되었습니다.
+            </p>
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                style={{
+                  minHeight: 44,
+                  padding: "0.5rem 1rem",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#2563eb",
+                  color: "#fff",
+                  fontWeight: 700,
+                }}
+                onClick={() => {
+                  setBracketHubModal(null);
+                  void loadLatestBracket();
+                  routerRefresh();
+                }}
+              >
+                확인
+              </button>
+            </div>
+          </>
+        ) : null}
+        {bracketHubModal.type === "shuffleRegenSuccess" ? (
+          <>
+            <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>대진표 생성/재생성</h2>
+            <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+              대진표가 재생성되었습니다.
+            </p>
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                style={{
+                  minHeight: 44,
+                  padding: "0.5rem 1rem",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#d97706",
+                  color: "#fff",
+                  fontWeight: 700,
+                }}
+                onClick={() => {
+                  setBracketHubModal(null);
+                  void loadLatestBracket();
+                  routerRefresh();
+                }}
+              >
+                확인
+              </button>
+            </div>
+          </>
+        ) : null}
+        {bracketHubModal.type === "participantsRequired" ? (
+          <>
+            <h2
+              id="bracket-hub-participants-required-title"
+              style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}
+            >
+              참가자 확정이 필요합니다
+            </h2>
+            <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
+              대진표를 만들려면 먼저 참가자를 확정해야 합니다.
+              <br />
+              신청자 관리에서 참가자를 확정한 뒤 다시 진행하세요.
+            </p>
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="v3-btn"
+                onClick={() => setBracketHubModal(null)}
+                style={{ minHeight: 44, fontWeight: 700 }}
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBracketHubModal(null);
+                  routerPush(`/client/tournaments/${tournamentId}/participants`);
+                }}
+                style={{
+                  minHeight: 44,
+                  padding: "0.5rem 1rem",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#2563eb",
+                  color: "#fff",
+                  fontWeight: 700,
+                }}
+              >
+                신청자 관리로 이동
+              </button>
+            </div>
+          </>
+        ) : null}
+        {bracketHubModal.type === "error" ? (
+          <>
+            <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>안내</h2>
+            <p
+              style={{
+                margin: "0 0 0.85rem",
+                fontSize: "0.88rem",
+                lineHeight: 1.5,
+                color: "#334155",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {bracketHubModal.message}
+            </p>
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="v3-btn"
+                onClick={() => setBracketHubModal(null)}
+                style={{ minHeight: 44, fontWeight: 700 }}
+              >
+                확인
+              </button>
+            </div>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 type HubApplicationListItem = {
   status?: string;
@@ -555,7 +864,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const [tournamentStatusBadge, setTournamentStatusBadge] = useState("");
   const [applicationListItems, setApplicationListItems] = useState<HubApplicationListItem[]>([]);
   const [applicationListLoading, setApplicationListLoading] = useState(false);
-  const [selectedQuickRoundNumber, setSelectedQuickRoundNumber] = useState<number | null>(null);
+  const [quickResultsRoundExpanded, setQuickResultsRoundExpanded] = useState<Record<number, boolean>>({});
   const confirmedSectionRef = useRef<HTMLDivElement | null>(null);
   const didInitialBoardFocusRef = useRef(false);
 
@@ -704,16 +1013,45 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     [displayRounds],
   );
 
-  useEffect(() => {
-    if (!displayRoundsSorted.length) {
-      setSelectedQuickRoundNumber(null);
-      return;
+  const quickResultsRoundCards = useMemo(() => {
+    if (variant !== "quickResults") return [];
+    const sorted = displayRoundsSorted;
+    if (!sorted.length) return [];
+    const firstIncompleteIdx = sorted.findIndex((r) => r.status !== "COMPLETED");
+    const inProgress = firstIncompleteIdx === -1 ? null : sorted[firstIncompleteIdx]!;
+    const nextCandidate =
+      inProgress && firstIncompleteIdx + 1 < sorted.length ? sorted[firstIncompleteIdx + 1]! : null;
+    const nextWaiting =
+      nextCandidate && nextCandidate.matches.every((m) => m.status === "PENDING") ? nextCandidate : null;
+    const topKeys = new Set<number>();
+    const cards: Array<{ round: BracketRoundDoc; role: "inProgress" | "next" | "completed" }> = [];
+    if (inProgress) {
+      cards.push({ round: inProgress, role: "inProgress" });
+      topKeys.add(inProgress.roundNumber);
     }
-    setSelectedQuickRoundNumber((prev) => {
-      if (prev != null && displayRoundsSorted.some((r) => r.roundNumber === prev)) return prev;
-      return displayRoundsSorted[0]!.roundNumber;
-    });
-  }, [displayRoundsSorted]);
+    if (nextWaiting && !topKeys.has(nextWaiting.roundNumber)) {
+      cards.push({ round: nextWaiting, role: "next" });
+      topKeys.add(nextWaiting.roundNumber);
+    }
+    for (const r of sorted) {
+      if (r.status === "COMPLETED" && !topKeys.has(r.roundNumber)) {
+        cards.push({ round: r, role: "completed" });
+        topKeys.add(r.roundNumber);
+      }
+    }
+    for (const r of sorted) {
+      if (!topKeys.has(r.roundNumber)) {
+        cards.push({ round: r, role: "inProgress" });
+        topKeys.add(r.roundNumber);
+      }
+    }
+    return cards;
+  }, [variant, displayRoundsSorted]);
+
+  useEffect(() => {
+    if (variant !== "quickResults") return;
+    setQuickResultsRoundExpanded({});
+  }, [variant, bracket?.id, boardSliceKey]);
 
   const bracketHasRecordedWinners = useMemo(() => bracketHasAnyRecordedWinner(bracket), [bracket]);
 
@@ -794,24 +1132,21 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
 
   const hubAdvanceTargetRound = useMemo(() => {
     if (!bracket || displayRoundsSorted.length === 0) return null;
-    const activeQuickRound =
-      displayRoundsSorted.find((r) => r.roundNumber === selectedQuickRoundNumber) ?? displayRoundsSorted[0] ?? null;
-    if (!activeQuickRound) return null;
-    if (activeQuickRound.status !== "COMPLETED") return null;
-    if (displayRounds.some((nextRound) => nextRound.roundNumber === activeQuickRound.roundNumber + 1)) return null;
-    return activeQuickRound;
-  }, [bracket, displayRoundsSorted, displayRounds, selectedQuickRoundNumber]);
-
-  const quickResultsActiveRound = useMemo(() => {
-    if (variant !== "quickResults") return null;
-    if (!displayRoundsSorted.length) return null;
-    return displayRoundsSorted.find((r) => r.roundNumber === selectedQuickRoundNumber) ?? displayRoundsSorted[0] ?? null;
-  }, [variant, displayRoundsSorted, selectedQuickRoundNumber]);
+    const candidates = displayRoundsSorted.filter(
+      (r) => r.status === "COMPLETED" && !displayRounds.some((n) => n.roundNumber === r.roundNumber + 1),
+    );
+    if (!candidates.length) return null;
+    return candidates.reduce((a, b) => (a.roundNumber > b.roundNumber ? a : b));
+  }, [bracket, displayRoundsSorted, displayRounds]);
 
   const quickDetailModalMatch = useMemo(() => {
-    if (!quickDetailMatchId || !quickResultsActiveRound) return null;
-    return quickResultsActiveRound.matches.find((m) => m.id === quickDetailMatchId) ?? null;
-  }, [quickDetailMatchId, quickResultsActiveRound]);
+    if (!quickDetailMatchId) return null;
+    for (const r of displayRoundsSorted) {
+      const m = r.matches.find((x) => x.id === quickDetailMatchId);
+      if (m) return m;
+    }
+    return null;
+  }, [quickDetailMatchId, displayRoundsSorted]);
 
   const quickDetailModalLabels = useMemo(() => {
     if (!quickDetailModalMatch) return { p1: "", p2: "" };
@@ -1827,11 +2162,15 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
       const b = bracketRef.current;
       if (!b) return { ok: false, error: "" };
       if (bracketLooksLikeSplitLayout(b)) {
-        return {
-          ok: false,
-          error:
-            "조분할 상태에서는 대진표 생성/재생성을 사용할 수 없습니다. 「분할취소」로 단일 예선으로 복귀한 뒤 이용해 주세요.",
-        };
+        const scoped =
+          scope === "final_only" || (typeof scope === "object" && scope && "blockId" in scope && scope.blockId);
+        if (!scoped) {
+          return {
+            ok: false,
+            error:
+              "조분할 상태에서는 예선 조 또는 결선을 선택한 뒤 해당 구간의 라운드만 재배치할 수 있습니다.",
+          };
+        }
       }
       try {
         const res = await fetch(
@@ -2258,9 +2597,14 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   );
 
   if (variant === "quickResults") {
-    const activeQuickRound = quickResultsActiveRound;
+    let quickSplitShuffleReady = true;
+    if (bracket && bracketLooksLikeSplitLayout(bracket)) {
+      const s = shuffleScopeForSlice(bracket, boardSliceKey);
+      quickSplitShuffleReady = s === "final_only" || typeof s === "object";
+    }
 
     return (
+      <>
       <main className="v3-page v3-stack" style={{ paddingTop: "0.25rem" }}>
         <div
           className="v3-row"
@@ -2393,12 +2737,118 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               </div>
             ) : null}
 
-            {activeQuickRound ? (
-              <section className="v3-box v3-stack" style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "0.5rem 0.55rem", gap: "0.35rem" }}>
+            {quickResultsRoundCards.length === 0 ? (
+              <p className="v3-muted">표시할 라운드가 없습니다.</p>
+            ) : (
+              quickResultsRoundCards.map(({ round, role }) => {
+                const expanded = Boolean(quickResultsRoundExpanded[round.roundNumber]);
+                const shuffleBlock = quickBracketRoundShuffleBlockedReason(displayRounds, round);
+                const shuffleDisabled =
+                  !quickSplitShuffleReady ||
+                  Boolean(shuffleBlock) ||
+                  actionLoading ||
+                  interactionLocked ||
+                  multiBlockBusy;
+                const showBody = role !== "completed" || expanded;
+                return (
+              <section
+                key={round.roundNumber}
+                className="v3-box v3-stack"
+                style={{
+                  marginBottom: "0.45rem",
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  padding: "0.5rem 0.55rem",
+                  gap: "0.35rem",
+                }}
+              >
+                <div
+                  className="v3-row"
+                  style={{
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: "0.35rem",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div className="v3-stack" style={{ gap: "0.12rem", minWidth: 0 }}>
+                    <div className="v3-row" style={{ alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "#0f172a" }}>
+                        {quickResultsRoundCardTitle(bracket, boardSliceKey, round)}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          color: role === "inProgress" ? "#2563eb" : role === "next" ? "#ca8a04" : "#64748b",
+                        }}
+                      >
+                        {role === "inProgress" ? "진행 중" : role === "next" ? "다음" : "완료"}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "0.72rem", color: "#64748b" }}>
+                      {round.matches.length}경기 · {round.matches.length * 2}명 슬롯
+                    </span>
+                  </div>
+                  <div className="v3-row" style={{ gap: "0.25rem", flexWrap: "wrap", alignItems: "center" }}>
+                    {role === "completed" ? (
+                      <button
+                        type="button"
+                        className="v3-btn"
+                        style={{
+                          minHeight: 32,
+                          padding: "0.2rem 0.45rem",
+                          fontSize: "0.78rem",
+                          fontWeight: 700,
+                          boxShadow: "none",
+                        }}
+                        onClick={() =>
+                          setQuickResultsRoundExpanded((prev) => ({
+                            ...prev,
+                            [round.roundNumber]: !prev[round.roundNumber],
+                          }))
+                        }
+                      >
+                        {expanded ? "접기" : "펼치기"}
+                      </button>
+                    ) : null}
+                    {round.matches.length > 1 ? (
+                    <button
+                      type="button"
+                      className="v3-btn"
+                      title={
+                        !quickSplitShuffleReady
+                          ? "예선 조 또는 결선을 선택한 뒤 사용하세요."
+                          : shuffleBlock ?? undefined
+                      }
+                      disabled={shuffleDisabled}
+                      style={{
+                        minHeight: 32,
+                        padding: "0.2rem 0.45rem",
+                        fontSize: "0.78rem",
+                        fontWeight: 700,
+                        boxShadow: "none",
+                      }}
+                      onClick={() => {
+                        if (!bracket) return;
+                        setBracketHubModal({
+                          type: "shuffleRegenConfirm",
+                          roundNumber: round.roundNumber,
+                          scope: shuffleScopeForSlice(bracket, boardSliceKey),
+                          shuffleUi: "quickCard",
+                        });
+                      }}
+                    >
+                      대진 재생성
+                    </button>
+                    ) : null}
+                  </div>
+                </div>
+                {showBody ? (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem" }}>
                     <tbody>
-                      {activeQuickRound.matches.map((match) => {
+                      {round.matches.map((match) => {
                         const p1Label = bracketSlotLabel(match.player1);
                         const p2Label = bracketSlotLabel(match.player2);
                         const done =
@@ -2470,7 +2920,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                                         className="v3-btn"
                                         style={{ minHeight: 34, padding: "0.25rem 0.55rem", fontWeight: 700 }}
                                         onClick={() =>
-                                          void handleSetWinner(match.id, match.player1.userId, activeQuickRound.roundNumber)
+                                          void handleSetWinner(match.id, match.player1.userId, round.roundNumber)
                                         }
                                         disabled={actionLoading || interactionLocked}
                                       >
@@ -2538,7 +2988,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                                         className="v3-btn"
                                         style={{ minHeight: 34, padding: "0.25rem 0.55rem", fontWeight: 700 }}
                                         onClick={() =>
-                                          void handleSetWinner(match.id, match.player2.userId, activeQuickRound.roundNumber)
+                                          void handleSetWinner(match.id, match.player2.userId, round.roundNumber)
                                         }
                                         disabled={actionLoading || interactionLocked}
                                       >
@@ -2555,7 +3005,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                                 disabled={!done || actionLoading || interactionLocked}
                                 onClick={() =>
                                   void handleQuickClearMatchResult(match.id, {
-                                    roundNumber: activeQuickRound.roundNumber,
+                                    roundNumber: round.roundNumber,
                                     boardSliceKey,
                                   })
                                 }
@@ -2587,21 +3037,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                     </tbody>
                   </table>
                 </div>
-                {activeQuickRound.status === "COMPLETED" &&
-                !displayRounds.some((nextRound) => nextRound.roundNumber === activeQuickRound.roundNumber + 1) ? (
-                  <div className="v3-row" style={{ marginTop: "0.5rem" }}>
-                    <button
-                      type="button"
-                      className="v3-btn"
-                      onClick={() => handleAdvanceRound(activeQuickRound.roundNumber)}
-                      disabled={actionLoading || interactionLocked}
-                    >
-                      다음 라운드 생성
-                    </button>
-                  </div>
                 ) : null}
               </section>
-            ) : null}
+                );
+              })
+            )}
             {connectivityHint || saveStateText || message ? (
               <p className="v3-muted">
                 {connectivityHint}
@@ -2629,6 +3069,18 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           }}
         />
       </main>
+        <BracketHubModalLayer
+          bracketHubModal={bracketHubModal}
+          setBracketHubModal={setBracketHubModal}
+          multiBlockBusy={multiBlockBusy}
+          confirmShuffleRegenAndPost={confirmShuffleRegenAndPost}
+          confirmSplitCancelAndPost={confirmSplitCancelAndPost}
+          loadLatestBracket={loadLatestBracket}
+          tournamentId={tournamentId}
+          routerRefresh={() => router.refresh()}
+          routerPush={(href) => void router.push(href)}
+        />
+      </>
     );
   }
 
@@ -2638,6 +3090,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   );
 
   return (
+    <>
     <main className="v3-page v3-stack" style={{ paddingTop: "0.35rem" }}>
       <p className="v3-muted" style={{ margin: 0, fontSize: "0.78rem", lineHeight: 1.45 }}>
         대회 시작 시 대회 카드 상태를 &quot;진행중&quot;으로 변경해 주세요. 상태 변경 시 대회 상세 버튼과 표시 내용이 자동 변경됩니다.
@@ -3023,6 +3476,32 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           <p className="v3-muted">아직 확정된 대진표가 없습니다. 「1. 대진표 자동생성」에서 먼저 만들어 주세요.</p>
         ) : (
           <>
+            <div className="v3-stack" style={{ gap: "0.35rem", width: "100%", marginBottom: "0.35rem" }}>
+              <Link
+                prefetch={false}
+                href={`/client/tournaments/${encodeURIComponent(tournamentId)}/bracket/attendance${zonesEnabled && selectedZoneId ? `?zoneId=${encodeURIComponent(selectedZoneId)}` : ""}`}
+                style={{
+                  width: "100%",
+                  minHeight: "52px",
+                  borderRadius: "8px",
+                  border: "1px solid #7c3aed",
+                  background: "#7c3aed",
+                  color: "#fff",
+                  fontWeight: 800,
+                  fontSize: "1rem",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "none",
+                }}
+              >
+                출석 확인
+              </Link>
+              <p className="v3-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+                대회 당일 출석 체크는 「대진표 운영」에서 진행합니다.
+              </p>
+            </div>
             {bracketLooksLikeSplitLayout(bracket) && bracket.blocks?.length ? (
               <div
                 className="v3-row"
@@ -3542,244 +4021,18 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           </div>
         </div>
       ) : null}
-
-      {bracketHubModal ? (
-        <div
-          role="presentation"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 402,
-            background: "rgba(15,23,42,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding:
-              "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, var(--client-bottom-space, 80px)) max(16px, env(safe-area-inset-left))",
-            boxSizing: "border-box",
-          }}
-          onClick={() => {
-            if (multiBlockBusy) return;
-            if (bracketHubModal.type === "shuffleRegenConfirm" || bracketHubModal.type === "participantsRequired") {
-              setBracketHubModal(null);
-            }
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={
-              bracketHubModal.type === "participantsRequired"
-                ? "bracket-hub-participants-required-title"
-                : undefined
-            }
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: "22rem",
-              background: "#fff",
-              borderRadius: "12px",
-              padding: "1.15rem",
-              border: "1px solid #cbd5e1",
-              boxShadow: "none",
-              boxSizing: "border-box",
-            }}
-          >
-            {bracketHubModal.type === "splitCancelConfirm" ? (
-              <>
-                <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>조 분할 취소</h2>
-                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
-                  분할을 취소하면 단일 대진표로 돌아갑니다. 대진 순서와 상대는 그대로 유지됩니다. 계속하시겠습니까?
-                </p>
-                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    className="v3-btn"
-                    disabled={multiBlockBusy}
-                    onClick={() => setBracketHubModal(null)}
-                    style={{ minHeight: 44 }}
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    disabled={multiBlockBusy}
-                    onClick={() => void confirmSplitCancelAndPost()}
-                    style={{
-                      minHeight: 44,
-                      padding: "0.5rem 1rem",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: "#2563eb",
-                      color: "#fff",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {multiBlockBusy ? "처리 중…" : "확인"}
-                  </button>
-                </div>
-              </>
-            ) : null}
-            {bracketHubModal.type === "shuffleRegenConfirm" ? (
-              <>
-                <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>대진표 생성/재생성</h2>
-                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
-                  대진표가 재생성되면 기존 대진은 되돌릴 수 없습니다. 계속하시겠습니까?
-                </p>
-                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    className="v3-btn"
-                    disabled={multiBlockBusy}
-                    onClick={() => setBracketHubModal(null)}
-                    style={{ minHeight: 44 }}
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    disabled={multiBlockBusy}
-                    onClick={() =>
-                      void confirmShuffleRegenAndPost(bracketHubModal.roundNumber, bracketHubModal.scope)
-                    }
-                    style={{
-                      minHeight: 44,
-                      padding: "0.5rem 1rem",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: "#d97706",
-                      color: "#fff",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {multiBlockBusy ? "처리 중…" : "확인"}
-                  </button>
-                </div>
-              </>
-            ) : null}
-            {bracketHubModal.type === "splitCancelSuccess" ? (
-              <>
-                <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>조 분할 취소</h2>
-                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
-                  분할이 취소되었습니다.
-                </p>
-                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    style={{
-                      minHeight: 44,
-                      padding: "0.5rem 1rem",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: "#2563eb",
-                      color: "#fff",
-                      fontWeight: 700,
-                    }}
-                    onClick={() => {
-                      setBracketHubModal(null);
-                      void loadLatestBracket();
-                      router.refresh();
-                    }}
-                  >
-                    확인
-                  </button>
-                </div>
-              </>
-            ) : null}
-            {bracketHubModal.type === "shuffleRegenSuccess" ? (
-              <>
-                <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>대진표 생성/재생성</h2>
-                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
-                  대진표가 재생성되었습니다.
-                </p>
-                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    style={{
-                      minHeight: 44,
-                      padding: "0.5rem 1rem",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: "#d97706",
-                      color: "#fff",
-                      fontWeight: 700,
-                    }}
-                    onClick={() => {
-                      setBracketHubModal(null);
-                      void loadLatestBracket();
-                      router.refresh();
-                    }}
-                  >
-                    확인
-                  </button>
-                </div>
-              </>
-            ) : null}
-            {bracketHubModal.type === "participantsRequired" ? (
-              <>
-                <h2
-                  id="bracket-hub-participants-required-title"
-                  style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}
-                >
-                  참가자 확정이 필요합니다
-                </h2>
-                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155" }}>
-                  대진표를 만들려면 먼저 참가자를 확정해야 합니다.
-                  <br />
-                  신청자 관리에서 참가자를 확정한 뒤 다시 진행하세요.
-                </p>
-                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    className="v3-btn"
-                    onClick={() => setBracketHubModal(null)}
-                    style={{ minHeight: 44, fontWeight: 700 }}
-                  >
-                    닫기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBracketHubModal(null);
-                      router.push(`/client/tournaments/${tournamentId}/participants`);
-                    }}
-                    style={{
-                      minHeight: 44,
-                      padding: "0.5rem 1rem",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: "#2563eb",
-                      color: "#fff",
-                      fontWeight: 700,
-                    }}
-                  >
-                    신청자 관리로 이동
-                  </button>
-                </div>
-              </>
-            ) : null}
-            {bracketHubModal.type === "error" ? (
-              <>
-                <h2 style={{ margin: "0 0 0.65rem", fontSize: "1.05rem", fontWeight: 700 }}>안내</h2>
-                <p style={{ margin: "0 0 0.85rem", fontSize: "0.88rem", lineHeight: 1.5, color: "#334155", whiteSpace: "pre-wrap" }}>
-                  {bracketHubModal.message}
-                </p>
-                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    className="v3-btn"
-                    onClick={() => setBracketHubModal(null)}
-                    style={{ minHeight: 44, fontWeight: 700 }}
-                  >
-                    확인
-                  </button>
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
     </main>
+        <BracketHubModalLayer
+          bracketHubModal={bracketHubModal}
+          setBracketHubModal={setBracketHubModal}
+          multiBlockBusy={multiBlockBusy}
+          confirmShuffleRegenAndPost={confirmShuffleRegenAndPost}
+          confirmSplitCancelAndPost={confirmSplitCancelAndPost}
+          loadLatestBracket={loadLatestBracket}
+          tournamentId={tournamentId}
+          routerRefresh={() => router.refresh()}
+          routerPush={(href) => void router.push(href)}
+        />
+    </>
   );
 }

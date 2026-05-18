@@ -11,6 +11,7 @@ import {
   countApplicationCancelledChip,
   countCapacityOccupiedFromListItems,
   countPendingOperatorApplicationApproval,
+  filterConfirmedParticipantEntries,
   isProcessingCancelledEntry,
 } from "./client-participant-filter-shared";
 import ParticipantListRow from "./participants/ParticipantListRow";
@@ -204,6 +205,8 @@ export default function ClientTournamentParticipantsApplicationsBlock({
 
   useEffect(() => {
     deletedEntryIdsRef.current = getSharedDeletedEntryIds(tournamentId);
+    /** RSC가 갱신될 때마다 전체 list-items 재조회를 허용해, 늦게 도착한 구버전 목록이 최신 상태를 덮어쓰지 않게 한다. */
+    fullFetchDoneRef.current = false;
     setEntries((prev) => mergeServerEntriesWithPrev(initialEntries, prev, deletedEntryIdsRef.current));
   }, [initialEntries, tournamentId]);
 
@@ -243,7 +246,7 @@ export default function ClientTournamentParticipantsApplicationsBlock({
     return () => {
       cancelled = true;
     };
-  }, [tournamentId, participantCountSummary.total, initialEntries.length]);
+  }, [tournamentId, participantCountSummary.total, initialEntries.length, initialEntries]);
 
   const visibleEntries = useMemo(
     () => filterVisibleListEntries(entries, deletedEntryIdsRef.current),
@@ -304,6 +307,8 @@ export default function ClientTournamentParticipantsApplicationsBlock({
   const chipApproved = countApplicationApprovedChip(entries);
   const chipCancelled = countApplicationCancelledChip(entries);
   const printHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/print`;
+  const confirmedParticipantListCount = useMemo(() => filterConfirmedParticipantEntries(entries).length, [entries]);
+  const printConfirmedListTitle = `참가 확정자 명단(status APPROVED 기준) ${confirmedParticipantListCount}명`;
   const participantsPortraitHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants`;
   const tableViewHref = `/client/tournaments/${encodeURIComponent(tournamentId)}/participants/table-view`;
   const showFinalize = !CLOSED_BADGES.includes(tournamentStatusBadge);
@@ -465,6 +470,8 @@ export default function ClientTournamentParticipantsApplicationsBlock({
         window.alert(dj.error ?? "취소 처리에 실패했습니다.");
         return;
       }
+      /** 확정 취소 직후 목록 status가 서버와 맞도록 먼저 갱신(이후 badge 실패해도 신청 승인 취소 UI가 막히지 않게). */
+      router.refresh();
       const res = await fetch(`/api/client/tournaments/${encodeURIComponent(tournamentId)}/status-badge`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -570,7 +577,12 @@ export default function ClientTournamentParticipantsApplicationsBlock({
                   )}
                 </div>
                 <div className="client-tournament-manage__applicationsOpsGrid4Cell">
-                  <Link prefetch={false} href={printHref} className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--tileTeal">
+                  <Link
+                    prefetch={false}
+                    href={printHref}
+                    title={printConfirmedListTitle}
+                    className="client-tournament-manage__appActionSquare client-tournament-manage__appActionSquare--tileTeal"
+                  >
                     <>
                       <ClipboardList {...appActionLucideProps} aria-hidden />
                       <span className="client-tournament-manage__appActionLine">확정리스트</span>
@@ -616,7 +628,13 @@ export default function ClientTournamentParticipantsApplicationsBlock({
               <div className="client-tournament-manage__applicationsOpsRows">
                 <div className="client-tournament-manage__applicationsOpsRow">
                   <div className="client-tournament-manage__opsBarCell">
-                    <Link prefetch={false} href={printHref} className="client-tournament-manage__opsBarEqualBtn" style={{ ...opsBtn, textDecoration: "none" }}>
+                    <Link
+                      prefetch={false}
+                      href={printHref}
+                      title={printConfirmedListTitle}
+                      className="client-tournament-manage__opsBarEqualBtn"
+                      style={{ ...opsBtn, textDecoration: "none" }}
+                    >
                       확정리스트
                     </Link>
                   </div>

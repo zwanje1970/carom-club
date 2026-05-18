@@ -64,6 +64,27 @@ function formatAvg3(n: number): string {
   return Number.isFinite(n) ? n.toFixed(3) : "—";
 }
 
+function maskPhoneForMemberList(phone: string | null | undefined): string {
+  const d = String(phone ?? "").replace(/\D/g, "");
+  if (d.length >= 11) {
+    return `${d.slice(0, 3)}-****-${d.slice(-4)}`;
+  }
+  if (d.length >= 10) {
+    return `${d.slice(0, 3)}-****-${d.slice(-4)}`;
+  }
+  if (d.length >= 8) {
+    return `${d.slice(0, 2)}-****-${d.slice(-4)}`;
+  }
+  const t = String(phone ?? "").trim();
+  return t !== "" ? "****" : "—";
+}
+
+type MemberListRow = { userId: string; name: string; phone?: string | null };
+
+type SubstituteSubFlow =
+  | null
+  | { slot: "player1" | "player2"; step: "intent" | "warn" | "menu" | "member" | "guest" };
+
 function ResultPill({ label, variant }: { label: string; variant: "win" | "lose" }) {
   return (
     <span className={`${styles.pill} ${variant === "win" ? styles.pillWin : styles.pillLose}`}>{label}</span>
@@ -141,6 +162,8 @@ export type QuickResultDetailModalMatch = {
     highRunPlayer2: number | null;
     recordedAt: string;
   } | null;
+  substitutionBackupPlayer1?: { userId: string; name: string; displayName?: string | null } | null;
+  substitutionBackupPlayer2?: { userId: string; name: string; displayName?: string | null } | null;
 };
 
 type Props = {
@@ -174,6 +197,21 @@ export default function QuickResultDetailModal({
   const [highRunPlayer2, setHighRunPlayer2] = useState("");
   const [formError, setFormError] = useState("");
   const [saveBusy, setSaveBusy] = useState(false);
+  const [subFlow, setSubFlow] = useState<SubstituteSubFlow>(null);
+  const [subBusy, setSubBusy] = useState(false);
+  const [members, setMembers] = useState<MemberListRow[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [guestNameInput, setGuestNameInput] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setSubFlow(null);
+      setMemberSearch("");
+      setGuestNameInput("");
+      setMembers([]);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open || !match) return;
@@ -208,6 +246,47 @@ export default function QuickResultDetailModal({
 
   const p1IsFirst = firstAttackUserId === match?.player1.userId;
   const p2IsFirst = firstAttackUserId === match?.player2.userId;
+
+  const hasRecordConflict = Boolean(
+    match?.quickResultDetail != null ||
+      (match?.status === "COMPLETED" && (match?.winnerUserId ?? "").trim() !== ""),
+  );
+
+  useEffect(() => {
+    if (!open || subFlow?.step !== "member") return;
+    let cancelled = false;
+    setMembersLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch("/api/client/members", { credentials: "same-origin" });
+        const json = (await res.json()) as { members?: MemberListRow[]; error?: string };
+        if (cancelled) return;
+        if (res.ok && Array.isArray(json.members)) {
+          setMembers(json.members);
+        } else {
+          setMembers([]);
+          if (json.error) setFormError(json.error);
+        }
+      } catch {
+        if (!cancelled) setMembers([]);
+      } finally {
+        if (!cancelled) setMembersLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, subFlow?.step]);
+
+  const filteredMembers = useMemo(() => {
+    const q = memberSearch.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter((m) => {
+      const id = m.userId.toLowerCase();
+      const nm = (m.name ?? "").toLowerCase();
+      return id.includes(q) || nm.includes(q);
+    });
+  }, [memberSearch, members]);
 
   useEffect(() => {
     if (!open || !match || !tournamentId.trim()) return;
@@ -268,6 +347,60 @@ export default function QuickResultDetailModal({
       return cur === match.player1.userId ? match.player2.userId : match.player1.userId;
     });
   }, [match]);
+
+  const openSubstituteForSlot = useCallback((slot: "player1" | "player2") => {
+    if (!match || disabled || saveBusy || subBusy) return;
+    setSubFlow({ slot, step: "intent" });
+  }, [disabled, match, saveBusy, subBusy]);
+
+  const continueFromIntent = useCallback(
+    (slot: "player1" | "player2") => {
+      if (hasRecordConflict) {
+        setSubFlow({ slot, step: "warn" });
+      } else {
+        setSubFlow({ slot, step: "menu" });
+      }
+    },
+    [hasRecordConflict],
+  );
+
+  const callSubstitute = useCallback(
+    async (body: {
+      slot: "player1" | "player2";
+      mode: "member" | "guest" | "restore";
+      memberUserId?: string;
+      guestName?: string;
+    }) => {
+      if (!match || !tournamentId.trim()) return;
+      setSubBusy(true);
+      setFormError("");
+      try {
+        const res = await fetch(
+          `/api/client/tournaments/${encodeURIComponent(tournamentId)}/bracket/matches/${encodeURIComponent(match.id)}/substitute${bracketZoneQuery}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(body),
+          },
+        );
+        const json = (await res.json()) as { bracket?: unknown; error?: string };
+        if (!res.ok || !json.bracket) {
+          setFormError(json.error ?? "선수 교체에 실패했습니다.");
+          return;
+        }
+        onSaved(json.bracket);
+        setSubFlow(null);
+        setMemberSearch("");
+        setGuestNameInput("");
+      } catch {
+        setFormError("네트워크 오류로 선수 교체에 실패했습니다.");
+      } finally {
+        setSubBusy(false);
+      }
+    },
+    [bracketZoneQuery, match, onSaved, tournamentId],
+  );
 
   const handleSave = useCallback(async () => {
     if (!match || !tournamentId.trim()) return;
@@ -351,7 +484,7 @@ export default function QuickResultDetailModal({
           inputMode="numeric"
           value={endInning}
           onChange={(e) => setEndInning(e.target.value)}
-          disabled={disabled || saveBusy}
+          disabled={disabled || saveBusy || subBusy}
           aria-label="승자 이닝"
         />
       );
@@ -369,7 +502,7 @@ export default function QuickResultDetailModal({
           inputMode="numeric"
           value={endInning}
           onChange={(e) => setEndInning(e.target.value)}
-          disabled={disabled || saveBusy}
+          disabled={disabled || saveBusy || subBusy}
           aria-label="승자 이닝"
         />
       );
@@ -381,11 +514,14 @@ export default function QuickResultDetailModal({
   const p1AvgDisplay = preview ? formatAvg3(preview.avg1) : "—";
   const p2AvgDisplay = preview ? formatAvg3(preview.avg2) : "—";
 
+  const canRestoreP1 = Boolean(match.substitutionBackupPlayer1?.userId?.trim());
+  const canRestoreP2 = Boolean(match.substitutionBackupPlayer2?.userId?.trim());
+
   return (
     <div
       role="presentation"
       className={styles.overlay}
-      onClick={() => (!saveBusy && !disabled ? onClose() : null)}
+      onClick={() => (!saveBusy && !subBusy && !disabled ? onClose() : null)}
     >
       <div
         role="dialog"
@@ -402,12 +538,180 @@ export default function QuickResultDetailModal({
             type="button"
             className={styles.swapBtn}
             onClick={handleSwapBreak}
-            disabled={disabled || saveBusy}
+            disabled={disabled || saveBusy || subBusy}
           >
             선구 변경
           </button>
         </div>
         <p className={styles.hint}>승패는 목록의 승·패 버튼으로만 반영됩니다. 여기서는 기록만 저장합니다.</p>
+
+        {subFlow && subFlow.step !== "warn" ? (
+          <section className={styles.substPanel} aria-label="선수 교체">
+            <p className={styles.substPanelTitle}>
+              {subFlow.slot === "player1" ? p1Label : p2Label} · 선수교체
+            </p>
+            {subFlow.step === "intent" ? (
+              <>
+                <p className={styles.substIntentText}>
+                  선수 교체 메뉴로 이동합니다. 오터치 방지를 위해 한 번 더 확인합니다.
+                </p>
+                <div className={styles.substMenuRow}>
+                  <button
+                    type="button"
+                    className={styles.substMenuBtn}
+                    disabled={subBusy}
+                    onClick={() => continueFromIntent(subFlow.slot)}
+                  >
+                    메뉴로
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.substMenuBtnCancel}
+                    disabled={subBusy}
+                    onClick={() => setSubFlow(null)}
+                  >
+                    취소
+                  </button>
+                </div>
+              </>
+            ) : null}
+            {subFlow.step === "menu" ? (
+              <>
+                <div className={styles.substMenuRow}>
+                  <button
+                    type="button"
+                    className={styles.substMenuBtn}
+                    disabled={subBusy}
+                    onClick={() => setSubFlow({ slot: subFlow.slot, step: "member" })}
+                  >
+                    회원으로 교체
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.substMenuBtn}
+                    disabled={subBusy}
+                    onClick={() => setSubFlow({ slot: subFlow.slot, step: "guest" })}
+                  >
+                    비회원 입력
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.substMenuBtn}
+                    disabled={
+                      subBusy ||
+                      (subFlow.slot === "player1" ? !canRestoreP1 : !canRestoreP2)
+                    }
+                    onClick={() =>
+                      void callSubstitute({
+                        slot: subFlow.slot,
+                        mode: "restore",
+                      })
+                    }
+                  >
+                    원래 선수 복구
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.substMenuBtnCancel}
+                    disabled={subBusy}
+                    onClick={() => setSubFlow(null)}
+                  >
+                    취소
+                  </button>
+                </div>
+              </>
+            ) : null}
+            {subFlow.step === "member" ? (
+              <>
+                <input
+                  className={styles.memberSearch}
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                  placeholder="회원 ID 검색 (이름 입력 가능)"
+                  disabled={subBusy}
+                  aria-label="회원 ID 검색"
+                />
+                {membersLoading ? (
+                  <p className={styles.hint}>목록 불러오는 중…</p>
+                ) : (
+                  <ul className={styles.memberList} role="listbox" aria-label="회원 목록">
+                    {filteredMembers.length === 0 ? (
+                      <li className={styles.memberListItem} style={{ cursor: "default" }}>
+                        검색 결과가 없습니다.
+                      </li>
+                    ) : (
+                      filteredMembers.map((m) => (
+                        <li key={m.userId} style={{ listStyle: "none" }}>
+                          <button
+                            type="button"
+                            className={styles.memberListItem}
+                            disabled={subBusy}
+                            onClick={() =>
+                              void callSubstitute({
+                                slot: subFlow.slot,
+                                mode: "member",
+                                memberUserId: m.userId,
+                              })
+                            }
+                          >
+                            <span className={styles.memberName}>{m.name || "이름 없음"}</span>
+                            <span className={styles.memberMeta}>
+                              {m.userId}
+                              <br />
+                              {maskPhoneForMemberList(m.phone)}
+                            </span>
+                          </button>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+                <div className={styles.substRowActions}>
+                  <button type="button" className={styles.substMenuBtn} disabled={subBusy} onClick={() => setSubFlow({ slot: subFlow.slot, step: "menu" })}>
+                    뒤로
+                  </button>
+                  <button type="button" className={styles.substCancelBtn} disabled={subBusy} onClick={() => setSubFlow(null)}>
+                    닫기
+                  </button>
+                </div>
+              </>
+            ) : null}
+            {subFlow.step === "guest" ? (
+              <>
+                <input
+                  className={styles.guestInput}
+                  value={guestNameInput}
+                  onChange={(e) => setGuestNameInput(e.target.value)}
+                  placeholder="비회원 이름"
+                  disabled={subBusy}
+                  aria-label="비회원 이름"
+                />
+                <div className={styles.substRowActions}>
+                  <button
+                    type="button"
+                    className={styles.substMenuBtn}
+                    disabled={subBusy}
+                    onClick={() =>
+                      void callSubstitute({
+                        slot: subFlow.slot,
+                        mode: "guest",
+                        guestName: guestNameInput,
+                      })
+                    }
+                  >
+                    적용
+                  </button>
+                  <button type="button" className={styles.substMenuBtn} disabled={subBusy} onClick={() => setSubFlow({ slot: subFlow.slot, step: "menu" })}>
+                    뒤로
+                  </button>
+                  <button type="button" className={styles.substCancelBtn} disabled={subBusy} onClick={() => setSubFlow(null)}>
+                    닫기
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </section>
+        ) : null}
 
         <table className={styles.recordTable}>
           <thead>
@@ -416,6 +720,14 @@ export default function QuickResultDetailModal({
               <th className={styles.playerCol}>
                 <div className={styles.playerHead}>
                   <span>{p1Label}</span>
+                  <button
+                    type="button"
+                    className={styles.substitutePill}
+                    disabled={disabled || saveBusy || subBusy}
+                    onClick={() => openSubstituteForSlot("player1")}
+                  >
+                    선수교체
+                  </button>
                   {matchCompleted ? (
                     p1Win ? <ResultPill label="승" variant="win" /> : p2Win ? <ResultPill label="패" variant="lose" /> : null
                   ) : null}
@@ -425,6 +737,14 @@ export default function QuickResultDetailModal({
               <th className={styles.playerCol}>
                 <div className={styles.playerHead}>
                   <span>{p2Label}</span>
+                  <button
+                    type="button"
+                    className={styles.substitutePill}
+                    disabled={disabled || saveBusy || subBusy}
+                    onClick={() => openSubstituteForSlot("player2")}
+                  >
+                    선수교체
+                  </button>
                   {matchCompleted ? (
                     p2Win ? <ResultPill label="승" variant="win" /> : p1Win ? <ResultPill label="패" variant="lose" /> : null
                   ) : null}
@@ -442,7 +762,7 @@ export default function QuickResultDetailModal({
                   inputMode="numeric"
                   value={scorePlayer1}
                   onChange={(e) => setScorePlayer1(e.target.value)}
-                  disabled={disabled || saveBusy || !matchCompleted}
+                  disabled={disabled || saveBusy || subBusy || !matchCompleted}
                 />
               </td>
               <td className={styles.playerCol}>
@@ -451,7 +771,7 @@ export default function QuickResultDetailModal({
                   inputMode="numeric"
                   value={scorePlayer2}
                   onChange={(e) => setScorePlayer2(e.target.value)}
-                  disabled={disabled || saveBusy || !matchCompleted}
+                  disabled={disabled || saveBusy || subBusy || !matchCompleted}
                 />
               </td>
             </tr>
@@ -475,7 +795,7 @@ export default function QuickResultDetailModal({
                 <OptionalHighRunInput
                   value={highRunPlayer1}
                   onChange={setHighRunPlayer1}
-                  disabled={disabled || saveBusy || !matchCompleted}
+                  disabled={disabled || saveBusy || subBusy || !matchCompleted}
                   ariaLabel="선수1 하이런"
                 />
               </td>
@@ -483,7 +803,7 @@ export default function QuickResultDetailModal({
                 <OptionalHighRunInput
                   value={highRunPlayer2}
                   onChange={setHighRunPlayer2}
-                  disabled={disabled || saveBusy || !matchCompleted}
+                  disabled={disabled || saveBusy || subBusy || !matchCompleted}
                   ariaLabel="선수2 하이런"
                 />
               </td>
@@ -494,18 +814,39 @@ export default function QuickResultDetailModal({
         {formError ? <p className={styles.formError}>{formError}</p> : null}
 
         <div className={styles.actions}>
-          <button type="button" className={`v3-btn ${styles.actionBtn}`} disabled={saveBusy || disabled} onClick={onClose}>
+          <button type="button" className={`v3-btn ${styles.actionBtn}`} disabled={saveBusy || subBusy || disabled} onClick={onClose}>
             닫기
           </button>
           <button
             type="button"
             className={`ui-btn-primary-solid ${styles.saveBtn}`}
-            disabled={saveBusy || disabled || !matchCompleted}
+            disabled={saveBusy || subBusy || disabled || !matchCompleted}
             onClick={() => void handleSave()}
           >
             {saveBusy ? "저장 중…" : "저장"}
           </button>
         </div>
+
+        {subFlow?.step === "warn" ? (
+          <div
+            className={styles.warnOverlay}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="subst-warn-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.warnBox}>
+              <p id="subst-warn-title">선수명 교체 시 기록이 맞지 않습니다.</p>
+              <button
+                type="button"
+                className={`ui-btn-primary-solid ${styles.warnConfirm}`}
+                onClick={() => setSubFlow({ slot: subFlow.slot, step: "menu" })}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

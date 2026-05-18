@@ -434,7 +434,7 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
         </div>
         <textarea
           className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight} ${editorStyles.fieldTextareaTitleSlot}`}
-          rows={1}
+          rows={3}
           value={title}
           disabled={disabled}
           onChange={(e) => setTitle(clampTitleToMaxLines(e.target.value))}
