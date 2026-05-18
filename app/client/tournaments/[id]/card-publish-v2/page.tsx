@@ -12,6 +12,22 @@ import { CardPublishBackgroundTab, CardPublishContentTab } from "./CardPublishEd
 import { normalizeCardEditorBackgroundUpload } from "./normalize-card-editor-background-upload";
 import { CardPublishPreview, type CardPublishPreviewModel } from "./CardPublishPreview";
 
+function logCardColorDiagPaletteFromEditor(args: {
+  footerDateTextColor: string;
+  footerPlaceTextColor: string;
+  previewModelDateColor?: string;
+  previewModelPlaceColor?: string;
+}): void {
+  if (process.env.NODE_ENV === "production") return;
+  console.info("[card-color-diag:palette-state]", {
+    source: "editor-page-state",
+    editorSelectedDateColor: args.footerDateTextColor.trim() || "(empty)",
+    editorSelectedPlaceColor: args.footerPlaceTextColor.trim() || "(empty)",
+    previewModelDateColor: args.previewModelDateColor?.trim() || "(empty)",
+    previewModelPlaceColor: args.previewModelPlaceColor?.trim() || "(empty)",
+  });
+}
+
 /** 신규 작성·저장 스냅샷 없을 때 미리보기·팔레트 기본(32색 중 하늘색) */
 const DEFAULT_CARD_MEDIA_BACKGROUND = "#38BDF8";
 
@@ -322,8 +338,6 @@ export default function ClientTournamentCardPublishV2Page() {
     const lead = leadTextColor.trim();
     const tc = titleTextColor.trim();
     const dc = descriptionTextColor.trim();
-    const fdc = footerDateTextColor.trim();
-    const fpc = footerPlaceTextColor.trim();
     return {
       slideTitle: title.length > 0 ? title : "(제목)",
       slideSubtitle: subtitle.length ? subtitle : "·",
@@ -349,8 +363,6 @@ export default function ClientTournamentCardPublishV2Page() {
       slideGradientPreset: gradientPreset,
       slideGradientOpacity: gradientOpacity,
       slideSurfaceFull: false,
-      slideFooterDateTextColor: fdc || undefined,
-      slideFooterPlaceTextColor: fpc || undefined,
     };
   }, [
     title,
@@ -370,8 +382,6 @@ export default function ClientTournamentCardPublishV2Page() {
     bottomBarOpacity,
     gradientPreset,
     gradientOpacity,
-    footerDateTextColor,
-    footerPlaceTextColor,
     uploadedImage?.w320Url,
     captureImageSrc,
     cardTemplate,
@@ -385,6 +395,15 @@ export default function ClientTournamentCardPublishV2Page() {
   const activateV2Media = useCallback(() => {
     setV2MediaMode("on");
   }, []);
+
+  useEffect(() => {
+    logCardColorDiagPaletteFromEditor({
+      footerDateTextColor,
+      footerPlaceTextColor,
+      previewModelDateColor: footerDateTextColor.trim() || undefined,
+      previewModelPlaceColor: footerPlaceTextColor.trim() || undefined,
+    });
+  }, [footerDateTextColor, footerPlaceTextColor]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -965,7 +984,12 @@ export default function ClientTournamentCardPublishV2Page() {
           <div className={editorStyles.previewCardSlot}>
             <div className={editorStyles.previewCardAspectFace}>
               <div className={`${editorStyles.previewCardWrap} ${editorStyles.previewCardWrapV2Chrome}`}>
-                <CardPublishPreview ref={cardPublishPreviewCaptureRef} model={previewModel} />
+                <CardPublishPreview
+                  ref={cardPublishPreviewCaptureRef}
+                  model={previewModel}
+                  editorFooterDateTextColor={footerDateTextColor}
+                  editorFooterPlaceTextColor={footerPlaceTextColor}
+                />
               </div>
             </div>
           </div>

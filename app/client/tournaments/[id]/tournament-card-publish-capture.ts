@@ -5,6 +5,7 @@ import {
   hasCaromNativeCaptureBridge,
   isCaromAppWebViewRuntime,
 } from "../../../../lib/carom-app-webview-runtime";
+import { logPlaceLayerDiagnosis } from "./card-publish-v2/preview-place-layer-diagnose";
 
 /** 네이티브 캡처 출력 목표 가로 픽셀 (크롭 후 리사이즈) */
 export const NATIVE_CAPTURE_TARGET_WIDTH = 960;
@@ -102,6 +103,8 @@ export async function captureAndUploadTournamentPublishedCardFullPngInBrowser(ar
   throwIfAborted(signal);
   await doubleRaf();
   throwIfAborted(signal);
+
+  logPlaceLayerDiagnosis(articleEl, "capture-before-path");
 
   // rect 측정
   const rect = articleEl.getBoundingClientRect();

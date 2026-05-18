@@ -5,6 +5,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useLayoutEffect, useRef } from "react";
 import type { TournamentCardOverlaySnapshot } from "../../lib/site/tournament-card-overlay-snapshot";
 import { TournamentStatusBadge, type TournamentPostStatus } from "./tournament-slide-card-status-badge";
+import { logCardColorDiagStyleObjects } from "../../lib/preview-card-footer-color-diagnose";
 import styles from "./tournament-slide-card-previews.module.css";
 
 /* 편집기 미리보기·게시 PNG(html2canvas) 입력용 HTML 렌더 — /site 메인 세로 덱은 평면화된 게시 PNG 1장(`MainSiteScrollCards`)만 표시(글자·배지 HTML 레이어 없음). 둥근 모서리는 카드 컨테이너(border-radius+overflow)가 담당. 디자인 좌표 440×180 아트보드(`slideDeckAspectFill`). */
@@ -386,6 +387,13 @@ function TournamentSlideCardPreview({
 
   const splitDateStyle = footerDateColor ? { color: footerDateColor } : undefined;
   const splitPlaceStyle = footerPlaceColor ? { color: footerPlaceColor } : undefined;
+
+  if (editorPreviewFixedLayout) {
+    logCardColorDiagStyleObjects(splitDateStyle, splitPlaceStyle, {
+      footerDateColorRaw: footerDateColor,
+      footerPlaceColorRaw: footerPlaceColor,
+    });
+  }
 
   const splitFooter = (
     <footer className={styles.cardFooter}>

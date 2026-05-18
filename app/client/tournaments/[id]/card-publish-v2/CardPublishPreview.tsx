@@ -1,6 +1,8 @@
 "use client";
 
-import { forwardRef, memo, useMemo } from "react";
+import { forwardRef, memo, useLayoutEffect, useMemo } from "react";
+import { logCardFooterColorDiagnosis } from "../../../../../lib/preview-card-footer-color-diagnose";
+import { logPlaceLayerDiagnosis } from "./preview-place-layer-diagnose";
 import {
   SLIDE_DECK_SOLID_BACKDROPS,
   TournamentSnapshotCardView,
@@ -34,11 +36,14 @@ export type CardPublishPreviewModel = {
   slideGradientPreset?: "none" | "top" | "left" | "top_left" | "soft";
   slideGradientOpacity?: number;
   slideSurfaceFull: boolean;
-  slideFooterDateTextColor?: string;
-  slideFooterPlaceTextColor?: string;
 };
 
-function slideItemFromModel(m: CardPublishPreviewModel): SlideDeckItem {
+function slideItemFromModel(
+  m: CardPublishPreviewModel,
+  editorFooter: { date: string; place: string },
+): SlideDeckItem {
+  const dateTrim = typeof editorFooter.date === "string" ? editorFooter.date.trim() : "";
+  const placeTrim = typeof editorFooter.place === "string" ? editorFooter.place.trim() : "";
   return {
     snapshotId: "card-publish-preview",
     title: m.slideTitle,
@@ -65,16 +70,54 @@ function slideItemFromModel(m: CardPublishPreviewModel): SlideDeckItem {
     ...(m.slideGradientPreset ? { cardGradientPreset: m.slideGradientPreset } : {}),
     ...(typeof m.slideGradientOpacity === "number" ? { cardGradientOpacity: m.slideGradientOpacity } : {}),
     ...(m.slideSurfaceFull ? { cardSurfaceLayout: "full" as const } : {}),
-    ...(m.slideFooterDateTextColor ? { cardFooterDateTextColor: m.slideFooterDateTextColor } : {}),
-    ...(m.slideFooterPlaceTextColor ? { cardFooterPlaceTextColor: m.slideFooterPlaceTextColor } : {}),
+    ...(dateTrim ? { cardFooterDateTextColor: dateTrim } : {}),
+    ...(placeTrim ? { cardFooterPlaceTextColor: placeTrim } : {}),
   };
 }
 
 const CardPublishPreviewInner = forwardRef<
   HTMLDivElement,
-  { model: CardPublishPreviewModel; isImageCaptureMode?: boolean }
->(function CardPublishPreviewInner({ model, isImageCaptureMode = false }, ref) {
-  const item = useMemo(() => slideItemFromModel(model), [model]);
+  {
+    model: CardPublishPreviewModel;
+    /** 편집기 state와 동일 소스 — 미리보기 푸터 날짜 글자색(항상 전달) */
+    editorFooterDateTextColor: string;
+    /** 편집기 state와 동일 소스 — 미리보기 푸터 장소 글자색(항상 전달) */
+    editorFooterPlaceTextColor: string;
+    isImageCaptureMode?: boolean;
+  }
+>(function CardPublishPreviewInner({
+  model,
+  editorFooterDateTextColor,
+  editorFooterPlaceTextColor,
+  isImageCaptureMode = false,
+}, ref) {
+  const item = useMemo(
+    () =>
+      slideItemFromModel(model, {
+        date: editorFooterDateTextColor,
+        place: editorFooterPlaceTextColor,
+      }),
+    [model, editorFooterDateTextColor, editorFooterPlaceTextColor],
+  );
+
+  useLayoutEffect(() => {
+    const root = typeof ref === "function" ? null : ref?.current;
+    if (!(root instanceof HTMLElement)) return;
+    const id = requestAnimationFrame(() => {
+      const cardRoot = root.querySelector('[data-tournament-card-capture-root="1"]');
+      if (cardRoot instanceof HTMLElement) {
+        logPlaceLayerDiagnosis(cardRoot, "preview");
+        logCardFooterColorDiagnosis(cardRoot, {
+          editorSelectedDateColor: editorFooterDateTextColor ?? "",
+          editorSelectedPlaceColor: editorFooterPlaceTextColor ?? "",
+          passedToCardDateColor: item.cardFooterDateTextColor ?? "",
+          passedToCardPlaceColor: item.cardFooterPlaceTextColor ?? "",
+        });
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [ref, item, isImageCaptureMode, editorFooterDateTextColor, editorFooterPlaceTextColor]);
+
   return (
     <div
       ref={ref}

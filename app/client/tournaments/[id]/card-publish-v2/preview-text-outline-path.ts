@@ -1,6 +1,7 @@
 "use client";
 
 import { parse as parseOpenType } from "opentype.js/dist/opentype.mjs";
+import { logPlaceLayerDiagnosis } from "./preview-place-layer-diagnose";
 
 const OUTLINE_FONT_PUBLIC_URL = "/card-fonts/Pretendard-Regular.otf";
 
@@ -185,6 +186,8 @@ export async function withCardPreviewTextPathLayer(args: {
     return;
   }
 
+  logPlaceLayerDiagnosis(cardRoot, "capture-before-path");
+
   const font = await loadOutlineFont();
   if (!font) {
     await args.run();
@@ -263,6 +266,7 @@ export async function withCardPreviewTextPathLayer(args: {
     hasSvgInCardRoot: cardRoot.contains(pathSvg),
     svgPathCount,
   });
+  logPlaceLayerDiagnosis(cardRoot, "capture-before-run");
   try {
     await args.run();
   } finally {
