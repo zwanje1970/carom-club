@@ -286,6 +286,27 @@
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.3);
 }
 
+/* 메인 세로 스크롤 덱 전용: 그림자 blur·spread만 축소(rgba alpha 유지) — 잔떨림 진단 테스트 */
+:global([data-site-main-scroll-deck="1"]) .sampleMainCardFace.sampleMainCardFaceTournamentDeck {
+  box-shadow: 0 3px 5px -2px rgba(15, 23, 42, 0.22);
+}
+
+:global([data-site-main-scroll-deck="1"])
+  .sampleMainCardSlot:active
+  .sampleMainCardFace.sampleMainCardFaceTournamentDeck:not(.sampleMainCardFaceSelected) {
+  box-shadow: 0 4px 7px -2px rgba(15, 23, 42, 0.26);
+}
+
+:global([data-site-main-scroll-deck="1"]) .sampleMainCardFace.sampleMainCardFaceTournamentDeck.sampleMainCardFaceSelected {
+  box-shadow: 0 4px 7px -2px rgba(15, 23, 42, 0.26);
+}
+
+:global([data-site-main-scroll-deck="1"])
+  .sampleMainCardSlot:active
+  .sampleMainCardFace.sampleMainCardFaceTournamentDeck.sampleMainCardFaceSelected {
+  box-shadow: 0 5px 9px -2px rgba(15, 23, 42, 0.3);
+}
+
 .sampleMainCardSlot:focus-visible .sampleMainCardFace.sampleMainCardFaceTournamentDeck {
   outline: 2px solid rgba(37, 99, 235, 0.85);
   outline-offset: 3px;
