@@ -18,6 +18,27 @@ import {
   resetMainScrollShakeDiagSession,
 } from "../../lib/site/main-scroll-shake-diag";
 
+/**
+ * scrollTop 대신 track `translate3d` 임시 검증 — `NEXT_PUBLIC_MAIN_SCROLL_USE_TRANSFORM_DIAG=1`
+ * (요청명 MAIN_SCROLL_USE_TRANSFORM_DIAG). 검증 후 제거·기존 scrollTop 경로 유지.
+ */
+function isMainScrollUseTransformDiagEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_MAIN_SCROLL_USE_TRANSFORM_DIAG === "1";
+}
+
+function applyMainScrollTrackTransformDiag(track: HTMLElement | null, offsetPx: number): void {
+  if (!track) return;
+  const roundedOffset = Math.round(offsetPx);
+  track.style.setProperty("transform", `translate3d(0, ${-roundedOffset}px, 0)`, "important");
+  track.style.setProperty("will-change", "transform", "important");
+}
+
+function clearMainScrollTrackTransformDiag(track: HTMLElement | null): void {
+  if (!track) return;
+  track.style.removeProperty("transform");
+  track.style.removeProperty("will-change");
+}
+
 /** 임시 진단 UI 위치·가시성 — 확인 후 제거 대상 */
 const MAIN_SHAKE_DIAG_COPY_BUTTON_STYLE: CSSProperties = {
   position: "fixed",
@@ -441,6 +462,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const sessionRestoreAppliedRef = useRef(false);
   /** `pxPerSec * dt` + carry; 매 프레임 `deltaTotal % 1`을 다음 carry로 유지 */
   const scrollPixelCarryRef = useRef(0);
+  /** transform 검증 모드: scrollTop 대신 가상 스크롤 위치(px) */
+  const mainScrollVirtualOffsetRef = useRef(0);
   /** [main-shake-diag] 마키 RAF effect 재실행 횟수 */
   const mainShakeRafEffectRunCountRef = useRef(0);
   const mainShakePrevCardTopRef = useRef<number | null>(null);
@@ -662,7 +685,13 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     const apply = () => {
       const maxScroll = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
       const nextTop = Math.min(Math.max(0, target), maxScroll);
-      viewport.scrollTop = nextTop;
+      if (isMainScrollUseTransformDiagEnabled()) {
+        mainScrollVirtualOffsetRef.current = nextTop;
+        viewport.scrollTop = 0;
+        applyMainScrollTrackTransformDiag(trackRef.current, nextTop);
+      } else {
+        viewport.scrollTop = nextTop;
+      }
       const now = performance.now();
       programmaticScrollUntilMsRef.current = Math.max(programmaticScrollUntilMsRef.current, now + 900);
       restoreSettleUntilMsRef.current = Math.max(restoreSettleUntilMsRef.current, now + 250);
@@ -813,11 +842,14 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       if (performance.now() < restoreSettleUntilMsRef.current) return;
       try {
         const maxScroll = Math.max(1, node.scrollHeight - node.clientHeight);
+        const scrollTopForStorage = isMainScrollUseTransformDiagEnabled()
+          ? mainScrollVirtualOffsetRef.current
+          : node.scrollTop;
         const payload: MainSiteScrollStoredV2 = {
           v: 2,
           idsKey,
-          scrollTop: node.scrollTop,
-          progressRatio: Math.min(1, Math.max(0, node.scrollTop / maxScroll)),
+          scrollTop: scrollTopForStorage,
+          progressRatio: Math.min(1, Math.max(0, scrollTopForStorage / maxScroll)),
         };
         sessionStorage.setItem(MAIN_SITE_SCROLL_STORAGE_KEY, JSON.stringify(payload));
       } catch {
@@ -979,7 +1011,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       const carryBefore = scrollPixelCarryRef.current;
       const deltaTotal = pxPerSec * dtSec + carryBefore;
       scrollPixelCarryRef.current = deltaTotal % 1;
-      const currentScrollValue = node.scrollTop;
+      const useTransformDiag = isMainScrollUseTransformDiagEnabled();
+      const currentScrollValue = useTransformDiag ? mainScrollVirtualOffsetRef.current : node.scrollTop;
       let nextScrollTop = currentScrollValue + deltaTotal;
       let wrapSubtractions = 0;
       while (nextScrollTop >= loopEnd && loopDistance > 0) {
@@ -1058,13 +1091,20 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             firstStart,
             loopEnd,
             maxScrollTop,
+            scrollApplyMode: useTransformDiag ? "transform" : "scrollTop",
+            transformRoundedOffset: useTransformDiag ? Math.round(appliedScrollTop) : null,
           },
         });
       }
 
       // programmatic scrollTop 변경 직후 발생하는 scroll 이벤트를 사용자 입력으로 오인하지 않도록 보호
       programmaticScrollUntilMsRef.current = performance.now() + 160;
-      node.scrollTop = appliedScrollTop;
+      if (useTransformDiag) {
+        mainScrollVirtualOffsetRef.current = appliedScrollTop;
+        applyMainScrollTrackTransformDiag(trackRef.current, appliedScrollTop);
+      } else {
+        node.scrollTop = appliedScrollTop;
+      }
 
       rafRef.current = requestAnimationFrame(step);
     };
@@ -1075,6 +1115,14 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       if (rafRef.current !== null) return;
       lastFrameTimeRef.current = null;
       scrollPixelCarryRef.current = 0;
+      if (isMainScrollUseTransformDiagEnabled()) {
+        const node = viewportRef.current;
+        if (node && node.scrollTop > 0) {
+          mainScrollVirtualOffsetRef.current = node.scrollTop;
+          node.scrollTop = 0;
+        }
+        applyMainScrollTrackTransformDiag(trackRef.current, mainScrollVirtualOffsetRef.current);
+      }
       if (isMainScrollShakeDiagEnabled()) {
         mainShakeRafStartedAtRef.current = performance.now();
       }
@@ -1110,11 +1158,14 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         const node = viewportRef.current;
         if (node && itemsRef.current.length > 0) {
           const maxScroll = Math.max(1, node.scrollHeight - node.clientHeight);
+          const scrollTopForStorage = isMainScrollUseTransformDiagEnabled()
+            ? mainScrollVirtualOffsetRef.current
+            : node.scrollTop;
           const payload: MainSiteScrollStoredV2 = {
             v: 2,
             idsKey: mainScrollIdsKey(itemsRef.current),
-            scrollTop: node.scrollTop,
-            progressRatio: Math.min(1, Math.max(0, node.scrollTop / maxScroll)),
+            scrollTop: scrollTopForStorage,
+            progressRatio: Math.min(1, Math.max(0, scrollTopForStorage / maxScroll)),
           };
           sessionStorage.setItem(MAIN_SITE_SCROLL_STORAGE_KEY, JSON.stringify(payload));
           logMainCardReturnDiag({
@@ -1137,6 +1188,15 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       viewport.removeEventListener("scroll", onScroll);
       resizeObserver?.disconnect();
       stopAutoSlide();
+      if (isMainScrollUseTransformDiagEnabled()) {
+        const track = trackRef.current;
+        const node = viewportRef.current;
+        const virtualTop = mainScrollVirtualOffsetRef.current;
+        clearMainScrollTrackTransformDiag(track);
+        if (node && virtualTop > 0) {
+          node.scrollTop = virtualTop;
+        }
+      }
       if (resumeTimerRef.current !== null) {
         window.clearTimeout(resumeTimerRef.current);
         resumeTimerRef.current = null;
