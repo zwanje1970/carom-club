@@ -24,6 +24,19 @@ export function getMainPreloadElapsedMs(): number {
   }
 }
 
+let mainCardImageDiagAnchorPerfMs: number | null = null;
+
+/** pageshow·session-restore kick 등 구간별 상대 시각 기준점 */
+export function markMainCardImageDiagAnchor(): void {
+  if (typeof performance === "undefined") return;
+  mainCardImageDiagAnchorPerfMs = performance.now();
+}
+
+export function getMainCardImageDiagRelativeMs(): number {
+  if (mainCardImageDiagAnchorPerfMs === null || typeof performance === "undefined") return 0;
+  return Math.round(performance.now() - mainCardImageDiagAnchorPerfMs);
+}
+
 function logTagged(tag: "main-preload" | "main-card-image", fields: Record<string, string | number | boolean | null | undefined>) {
   if (!isMainSiteLoadDiagEnabled()) return;
   const parts = [`[${tag}]`];
@@ -68,27 +81,49 @@ export function logMainPreload(
 export function logMainCardImage(
   phase:
     | "main-src-assigned"
+    | "main-img-mounted"
+    | "main-img-src-set"
     | "main-img-loaded"
+    | "main-img-decode-start"
     | "main-img-decoded"
+    | "main-img-decode-error"
     | "main-img-visible"
-    | "load-target-count",
+    | "load-target-count"
+    | "pageshow-kick-start"
+    | "pageshow-kick-done"
+    | "session-restore-kick-start"
+    | "session-restore-kick-done"
+    | "kick-visible-images",
   payload: {
     id?: string;
     url?: string;
     elapsedMs?: number;
+    relativeMs?: number;
     visibleOrNearCount?: number;
     totalRenderedCount?: number;
     totalDeckItems?: number;
+    foundImages?: number;
+    reloadedImages?: number;
+    decodedImages?: number;
+    error?: string;
   },
 ): void {
+  if (mainCardImageDiagAnchorPerfMs === null) {
+    markMainCardImageDiagAnchor();
+  }
   logTagged("main-card-image", {
     phase,
     id: payload.id ?? "",
     url: payload.url ?? "",
     elapsedMs: payload.elapsedMs ?? getMainPreloadElapsedMs(),
+    relativeMs: payload.relativeMs ?? getMainCardImageDiagRelativeMs(),
     visibleOrNearCount: payload.visibleOrNearCount,
     totalRenderedCount: payload.totalRenderedCount,
     totalDeckItems: payload.totalDeckItems,
+    foundImages: payload.foundImages,
+    reloadedImages: payload.reloadedImages,
+    decodedImages: payload.decodedImages,
+    error: payload.error ?? "",
   });
 }
 
