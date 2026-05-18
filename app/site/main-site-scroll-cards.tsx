@@ -28,8 +28,8 @@ function isMainScrollUseTransformDiagEnabled(): boolean {
 
 function applyMainScrollTrackTransformDiag(track: HTMLElement | null, offsetPx: number): void {
   if (!track) return;
-  const roundedOffset = Math.round(offsetPx);
-  track.style.setProperty("transform", `translate3d(0, ${-roundedOffset}px, 0)`, "important");
+  const transformOffset = Number(offsetPx.toFixed(3));
+  track.style.setProperty("transform", `translate3d(0, ${-transformOffset}px, 0)`, "important");
   track.style.setProperty("will-change", "transform", "important");
 }
 
@@ -1093,6 +1093,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             maxScrollTop,
             scrollApplyMode: useTransformDiag ? "transform" : "scrollTop",
             transformRoundedOffset: useTransformDiag ? Math.round(appliedScrollTop) : null,
+            transformOffset: useTransformDiag ? Number(appliedScrollTop.toFixed(3)) : null,
           },
         });
       }
