@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { KeyboardEvent, PointerEvent, Ref } from "react";
+import type { CSSProperties, KeyboardEvent, PointerEvent, Ref } from "react";
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
@@ -17,6 +17,22 @@ import {
   maybeLogMainScrollShakeFrame,
   resetMainScrollShakeDiagSession,
 } from "../../lib/site/main-scroll-shake-diag";
+
+/** 임시 진단 UI 위치·가시성 — 확인 후 제거 대상 */
+const MAIN_SHAKE_DIAG_COPY_BUTTON_STYLE: CSSProperties = {
+  position: "fixed",
+  right: 16,
+  bottom: "calc(env(safe-area-inset-bottom, 0px) + 120px)",
+  zIndex: 99999,
+  padding: "6px 10px",
+  fontSize: 12,
+  lineHeight: 1.2,
+  cursor: "pointer",
+  borderRadius: 6,
+  border: "1px solid rgba(0,0,0,0.35)",
+  background: "rgba(255,255,255,0.98)",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.28)",
+};
 
 function logMainCardReturnDiag(payload: Record<string, unknown>) {
   const args: unknown[] = ["[main-card-return-diag]"];
@@ -1148,20 +1164,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
                 typeof window !== "undefined" ? window.__COPY_MAIN_SHAKE_DIAG__ : undefined;
               if (fn) void fn();
             }}
-            style={{
-              position: "fixed",
-              right: 10,
-              bottom: 10,
-              zIndex: 99999,
-              padding: "6px 10px",
-              fontSize: 12,
-              lineHeight: 1.2,
-              cursor: "pointer",
-              borderRadius: 6,
-              border: "1px solid rgba(0,0,0,0.2)",
-              background: "rgba(255,255,255,0.92)",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
-            }}
+            style={MAIN_SHAKE_DIAG_COPY_BUTTON_STYLE}
           >
             떨림 로그 복사
           </button>
@@ -1232,20 +1235,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             const fn = typeof window !== "undefined" ? window.__COPY_MAIN_SHAKE_DIAG__ : undefined;
             if (fn) void fn();
           }}
-          style={{
-            position: "fixed",
-            right: 10,
-            bottom: 10,
-            zIndex: 99999,
-            padding: "6px 10px",
-            fontSize: 12,
-            lineHeight: 1.2,
-            cursor: "pointer",
-            borderRadius: 6,
-            border: "1px solid rgba(0,0,0,0.2)",
-            background: "rgba(255,255,255,0.92)",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
-          }}
+          style={MAIN_SHAKE_DIAG_COPY_BUTTON_STYLE}
         >
           떨림 로그 복사
         </button>
