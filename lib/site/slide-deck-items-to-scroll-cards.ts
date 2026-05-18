@@ -1,7 +1,7 @@
 import type { MainSiteScrollCardItem } from "../../app/site/main-site-scroll-cards";
 import type { SlideDeckItem } from "../../app/site/tournament-snapshot-card-view";
 
-/** 메인 세로 스크롤: 게시 PNG(640 우선) 1장만 표시 — 카드 DOM은 img+CTA만(오버레이·텍스트 HTML 중복 없음). */
+/** 메인 세로 스크롤: 게시 PNG(w480→w640→w320) 1장만 표시 — 카드 DOM은 img+CTA만(오버레이·텍스트 HTML 중복 없음). */
 export function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScrollCardItem[] {
   return items.map((item, index) => {
     const href = (item.targetDetailUrl ?? "").trim() || "/site/tournaments";
@@ -16,7 +16,7 @@ export function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScr
       const published640 = (item.publishedCardImageUrl ?? "").trim();
       const published320 = (item.publishedCardImage320Url ?? "").trim();
       const published480 = (item.publishedCardImage480Url ?? "").trim();
-      const publishedScrollBg = published640 || published480 || published320;
+      const publishedScrollBg = published480 || published640 || published320;
       if (publishedScrollBg) {
         return {
           id: rowId,
@@ -50,7 +50,7 @@ export function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScr
     const published640 = (item.publishedCardImageUrl ?? "").trim();
     const published320 = (item.publishedCardImage320Url ?? "").trim();
     const published480 = (item.publishedCardImage480Url ?? "").trim();
-    const scrollImg = published640 || published480 || published320;
+    const scrollImg = published480 || published640 || published320;
 
     return {
       id: rowId,
