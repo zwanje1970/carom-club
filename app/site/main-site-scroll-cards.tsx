@@ -26,9 +26,16 @@ function isMainScrollUseTransformDiagEnabled(): boolean {
   return process.env.NEXT_PUBLIC_MAIN_SCROLL_USE_TRANSFORM_DIAG === "1";
 }
 
+/**
+ * [임시 진단 테스트] transform 진단 경로에서 CSS translate3d만 정수 적용.
+ * 비교 끝나면 `false`로 원복. (Vercel `NEXT_PUBLIC_MAIN_SCROLL_ROUND_TRANSFORM_DIAG` 불필요)
+ */
+const FORCE_ROUND_TRANSFORM_IN_TRANSFORM_DIAG = true;
+
 /** transform 진단 전용 — 정수 transform vs 소수 transformOffset 비교 */
 function isMainScrollRoundTransformDiagEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_MAIN_SCROLL_ROUND_TRANSFORM_DIAG === "1";
+  if (!isMainScrollUseTransformDiagEnabled()) return false;
+  return FORCE_ROUND_TRANSFORM_IN_TRANSFORM_DIAG;
 }
 
 function resolveMainScrollTransformCssOffset(virtualOffsetPx: number): {
