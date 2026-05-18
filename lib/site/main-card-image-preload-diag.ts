@@ -134,3 +134,50 @@ export function isMainScrollDeckImageVisible(img: HTMLImageElement): boolean {
   const vw = typeof window !== "undefined" ? window.innerWidth : 0;
   return r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw;
 }
+
+const mainCardImageDecodeRequestCountByUrl = new Map<string, number>();
+const mainCardImageDecodeCompleteCountByUrl = new Map<string, number>();
+
+function mainCardImageDecodeCountUrlKey(url: string): string {
+  return url.trim();
+}
+
+/** URL별 decode() 요청 누적 — 중복 decode 최종 확인용 */
+export function logMainCardImageDecodeRequestCount(url: string): void {
+  if (!isMainSiteLoadDiagEnabled()) return;
+  const key = mainCardImageDecodeCountUrlKey(url);
+  if (!key) return;
+  if (mainCardImageDiagAnchorPerfMs === null) {
+    markMainCardImageDiagAnchor();
+  }
+  const count = (mainCardImageDecodeRequestCountByUrl.get(key) ?? 0) + 1;
+  mainCardImageDecodeRequestCountByUrl.set(key, count);
+  logTagged("main-card-image", { phase: "decode-count", url: key, count });
+  if (count > 1) {
+    logTagged("main-card-image", {
+      phase: "duplicate-decode",
+      url: key,
+      duplicateCount: count - 1,
+    });
+  }
+}
+
+/** URL별 decode() 완료 누적 — 중복 decode 최종 확인용 */
+export function logMainCardImageDecodedCount(url: string): void {
+  if (!isMainSiteLoadDiagEnabled()) return;
+  const key = mainCardImageDecodeCountUrlKey(url);
+  if (!key) return;
+  if (mainCardImageDiagAnchorPerfMs === null) {
+    markMainCardImageDiagAnchor();
+  }
+  const count = (mainCardImageDecodeCompleteCountByUrl.get(key) ?? 0) + 1;
+  mainCardImageDecodeCompleteCountByUrl.set(key, count);
+  logTagged("main-card-image", { phase: "decoded-count", url: key, count });
+  if (count > 1) {
+    logTagged("main-card-image", {
+      phase: "duplicate-decode",
+      url: key,
+      duplicateCount: count - 1,
+    });
+  }
+}

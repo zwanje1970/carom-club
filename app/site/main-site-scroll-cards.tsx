@@ -10,6 +10,8 @@ import {
   getMainPreloadElapsedMs,
   isMainScrollDeckImageVisible,
   logMainCardImage,
+  logMainCardImageDecodeRequestCount,
+  logMainCardImageDecodedCount,
   markMainCardImageDiagAnchor,
 } from "../../lib/site/main-card-image-preload-diag";
 import { isMainSiteLoadDiagEnabled, logMainSiteLoadDiag } from "../../lib/site/main-site-load-diag";
@@ -77,7 +79,14 @@ const MAIN_SHAKE_DIAG_COPY_BUTTON_STYLE: CSSProperties = {
 
 function tryDecodeMainScrollDeckImage(img: HTMLImageElement) {
   if (typeof img.decode !== "function") return;
-  void img.decode().catch(() => {});
+  const src = (img.currentSrc || img.src || "").trim();
+  if (src) logMainCardImageDecodeRequestCount(src);
+  void img
+    .decode()
+    .then(() => {
+      if (src) logMainCardImageDecodedCount(src);
+    })
+    .catch(() => {});
 }
 
 type MainScrollDeckKickStats = {
@@ -289,6 +298,7 @@ function useMainScrollDeckImageDiag(itemId: string, imageUrl: string) {
     const img = imgRef.current;
     if (!img) return;
     const afterDecode = () => {
+      logMainCardImageDecodedCount(url);
       logMainCardImage("main-img-decoded", {
         id: itemId,
         url,
@@ -305,6 +315,7 @@ function useMainScrollDeckImageDiag(itemId: string, imageUrl: string) {
         }
       });
     };
+    logMainCardImageDecodeRequestCount(url);
     logMainCardImage("main-img-decode-start", {
       id: itemId,
       url,
