@@ -1,10 +1,23 @@
 "use client";
 
 import { memo, type ChangeEvent, type RefObject } from "react";
-import { POSTCARD_TEMPLATE_TEXT_COLOR_SWATCHES } from "../../../../../lib/postcard-template-reference";
 import editorStyles from "../card-publish-editor.module.css";
 
-const CARD_TEXT_COLOR_SWATCHES = POSTCARD_TEMPLATE_TEXT_COLOR_SWATCHES;
+/** 게시카드 편집기 v2 글자색 12색 — 1열·우측 정렬(요청 순서) */
+export const CARD_EDITOR_TEXT_COLOR_SWATCHES = [
+  "#ffffff",
+  "#ffff00",
+  "#eab308",
+  "#ea580c",
+  "#84cc16",
+  "#16a34a",
+  "#14b8a6",
+  "#7dd3fc",
+  "#2563eb",
+  "#c4b5fd",
+  "#7c3aed",
+  "#0a0a0a",
+] as const;
 
 export const TextColorSwatches = memo(function TextColorSwatches({
   value,
@@ -13,6 +26,7 @@ export const TextColorSwatches = memo(function TextColorSwatches({
   swatchClass,
   swatchLightClass,
   swatchSelectedClass,
+  swatchCompactClass,
   disabled = false,
 }: {
   value: string;
@@ -21,18 +35,20 @@ export const TextColorSwatches = memo(function TextColorSwatches({
   swatchClass: string;
   swatchLightClass: string;
   swatchSelectedClass: string;
+  /** 12색 한 줄용 작은 스와치 */
+  swatchCompactClass?: string;
   disabled?: boolean;
 }) {
   return (
     <div className={wrapClass} role="group" aria-label="글자색">
-      {CARD_TEXT_COLOR_SWATCHES.map((hex) => {
+      {CARD_EDITOR_TEXT_COLOR_SWATCHES.map((hex) => {
         const selected = value.trim().toLowerCase() === hex.toLowerCase();
         const isLight = hex.toLowerCase() === "#ffffff";
         return (
           <button
             key={hex}
             type="button"
-            className={`${swatchClass} ${isLight ? swatchLightClass : ""} ${selected ? swatchSelectedClass : ""}`}
+            className={`${swatchClass} ${swatchCompactClass ?? ""} ${isLight ? swatchLightClass : ""} ${selected ? swatchSelectedClass : ""}`.trim()}
             style={{ backgroundColor: hex }}
             aria-label={`색 ${hex}`}
             aria-pressed={selected}
@@ -302,10 +318,10 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
   );
 });
 
-const DESCRIPTION_MAX_LINES = 3;
-const TITLE_MAX_LINES = 8;
-const LEAD_MAX_LINES = 4;
-const FOOTER_FIELD_MAX_LINES = 6;
+const DESCRIPTION1_MAX_LINES = 1;
+const DESCRIPTION2_MAX_LINES = 2;
+const TITLE_MAX_LINES = 3;
+const FOOTER_FIELD_MAX_LINES = 1;
 
 function clampDescriptionToMaxLines(value: string, maxLines: number): string {
   const lines = value.split(/\r?\n/);
@@ -314,14 +330,6 @@ function clampDescriptionToMaxLines(value: string, maxLines: number): string {
 
 function clampTitleToMaxLines(value: string): string {
   return clampDescriptionToMaxLines(value, TITLE_MAX_LINES);
-}
-
-function clampLeadToMaxLines(value: string): string {
-  return clampDescriptionToMaxLines(value, LEAD_MAX_LINES);
-}
-
-function clampFooterFieldToMaxLines(value: string): string {
-  return clampDescriptionToMaxLines(value, FOOTER_FIELD_MAX_LINES);
 }
 
 export const CardPublishContentTab = memo(function CardPublishContentTab({
@@ -383,45 +391,50 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
     <>
       <div className={editorStyles.field}>
         <div className={editorStyles.fieldHead}>
-          <span className={editorStyles.fieldLabel}>제목 위 한 줄</span>
-          <TextColorSwatches
-            value={leadTextColor}
-            onChange={setLeadTextColor}
-            wrapClass={editorStyles.fieldSwatches}
-            swatchClass={editorStyles.fieldSwatch}
-            swatchLightClass={editorStyles.fieldSwatchLight}
-            swatchSelectedClass={editorStyles.fieldSwatchSelected}
-            disabled={disabled}
-          />
+          <span className={editorStyles.fieldLabel}>설명1</span>
+          <div className={editorStyles.fieldHeadSwatchesPush}>
+            <TextColorSwatches
+              value={leadTextColor}
+              onChange={setLeadTextColor}
+              wrapClass={editorStyles.fieldSwatchesRow12}
+              swatchClass={editorStyles.fieldSwatch}
+              swatchCompactClass={editorStyles.fieldSwatchCompact}
+              swatchLightClass={editorStyles.fieldSwatchLight}
+              swatchSelectedClass={editorStyles.fieldSwatchSelected}
+              disabled={disabled}
+            />
+          </div>
         </div>
         <textarea
-          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
-          rows={2}
+          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight} ${editorStyles.fieldTextareaSingleLine}`}
+          rows={1}
           value={textLine1}
           disabled={disabled}
-          onChange={(e) => setTextLine1(clampLeadToMaxLines(e.target.value))}
+          onChange={(e) => setTextLine1(clampDescriptionToMaxLines(e.target.value, DESCRIPTION1_MAX_LINES))}
           autoComplete="off"
           spellCheck={false}
-          placeholder="비우면 표시 안 함"
         />
       </div>
 
       <div className={editorStyles.field}>
         <div className={editorStyles.fieldHead}>
           <span className={editorStyles.fieldLabel}>제목</span>
-          <TextColorSwatches
-            value={titleTextColor}
-            onChange={setTitleTextColor}
-            wrapClass={editorStyles.fieldSwatches}
-            swatchClass={editorStyles.fieldSwatch}
-            swatchLightClass={editorStyles.fieldSwatchLight}
-            swatchSelectedClass={editorStyles.fieldSwatchSelected}
-            disabled={disabled}
-          />
+          <div className={editorStyles.fieldHeadSwatchesPush}>
+            <TextColorSwatches
+              value={titleTextColor}
+              onChange={setTitleTextColor}
+              wrapClass={editorStyles.fieldSwatchesRow12}
+              swatchClass={editorStyles.fieldSwatch}
+              swatchCompactClass={editorStyles.fieldSwatchCompact}
+              swatchLightClass={editorStyles.fieldSwatchLight}
+              swatchSelectedClass={editorStyles.fieldSwatchSelected}
+              disabled={disabled}
+            />
+          </div>
         </div>
         <textarea
-          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
-          rows={3}
+          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight} ${editorStyles.fieldTextareaTitleSlot}`}
+          rows={1}
           value={title}
           disabled={disabled}
           onChange={(e) => setTitle(clampTitleToMaxLines(e.target.value))}
@@ -432,47 +445,52 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
 
       <div className={editorStyles.field}>
         <div className={editorStyles.fieldHead}>
-          <span className={editorStyles.fieldLabel}>설명 (최대 {DESCRIPTION_MAX_LINES}줄)</span>
-          <TextColorSwatches
-            value={descriptionTextColor}
-            onChange={setDescriptionTextColor}
-            wrapClass={editorStyles.fieldSwatches}
-            swatchClass={editorStyles.fieldSwatch}
-            swatchLightClass={editorStyles.fieldSwatchLight}
-            swatchSelectedClass={editorStyles.fieldSwatchSelected}
-            disabled={disabled}
-          />
+          <span className={editorStyles.fieldLabel}>설명2</span>
+          <div className={editorStyles.fieldHeadSwatchesPush}>
+            <TextColorSwatches
+              value={descriptionTextColor}
+              onChange={setDescriptionTextColor}
+              wrapClass={editorStyles.fieldSwatchesRow12}
+              swatchClass={editorStyles.fieldSwatch}
+              swatchCompactClass={editorStyles.fieldSwatchCompact}
+              swatchLightClass={editorStyles.fieldSwatchLight}
+              swatchSelectedClass={editorStyles.fieldSwatchSelected}
+              disabled={disabled}
+            />
+          </div>
         </div>
         <textarea
-          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
-          rows={3}
+          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight} ${editorStyles.fieldTextareaDesc2}`}
+          rows={2}
           value={textLine2}
           disabled={disabled}
-          onChange={(e) => setTextLine2(clampDescriptionToMaxLines(e.target.value, DESCRIPTION_MAX_LINES))}
+          onChange={(e) => setTextLine2(clampDescriptionToMaxLines(e.target.value, DESCRIPTION2_MAX_LINES))}
           spellCheck={false}
-          placeholder="비우면 카드에 표시하지 않음"
         />
       </div>
 
       <div className={editorStyles.field}>
         <div className={editorStyles.fieldHead}>
           <span className={editorStyles.fieldLabel}>날짜</span>
-          <TextColorSwatches
-            value={footerDateTextColor}
-            onChange={setFooterDateTextColor}
-            wrapClass={editorStyles.fieldSwatches}
-            swatchClass={editorStyles.fieldSwatch}
-            swatchLightClass={editorStyles.fieldSwatchLight}
-            swatchSelectedClass={editorStyles.fieldSwatchSelected}
-            disabled={disabled}
-          />
+          <div className={editorStyles.fieldHeadSwatchesPush}>
+            <TextColorSwatches
+              value={footerDateTextColor}
+              onChange={setFooterDateTextColor}
+              wrapClass={editorStyles.fieldSwatchesRow12}
+              swatchClass={editorStyles.fieldSwatch}
+              swatchCompactClass={editorStyles.fieldSwatchCompact}
+              swatchLightClass={editorStyles.fieldSwatchLight}
+              swatchSelectedClass={editorStyles.fieldSwatchSelected}
+              disabled={disabled}
+            />
+          </div>
         </div>
         <textarea
-          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
-          rows={2}
+          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight} ${editorStyles.fieldTextareaSingleLine}`}
+          rows={1}
           value={cardDate}
           disabled={disabled}
-          onChange={(e) => setCardDate(clampFooterFieldToMaxLines(e.target.value))}
+          onChange={(e) => setCardDate(clampDescriptionToMaxLines(e.target.value, FOOTER_FIELD_MAX_LINES))}
           autoComplete="off"
           spellCheck={false}
           placeholder="예: 2026-05-09 (일)"
@@ -482,22 +500,25 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
       <div className={editorStyles.field}>
         <div className={editorStyles.fieldHead}>
           <span className={editorStyles.fieldLabel}>장소</span>
-          <TextColorSwatches
-            value={footerPlaceTextColor}
-            onChange={setFooterPlaceTextColor}
-            wrapClass={editorStyles.fieldSwatches}
-            swatchClass={editorStyles.fieldSwatch}
-            swatchLightClass={editorStyles.fieldSwatchLight}
-            swatchSelectedClass={editorStyles.fieldSwatchSelected}
-            disabled={disabled}
-          />
+          <div className={editorStyles.fieldHeadSwatchesPush}>
+            <TextColorSwatches
+              value={footerPlaceTextColor}
+              onChange={setFooterPlaceTextColor}
+              wrapClass={editorStyles.fieldSwatchesRow12}
+              swatchClass={editorStyles.fieldSwatch}
+              swatchCompactClass={editorStyles.fieldSwatchCompact}
+              swatchLightClass={editorStyles.fieldSwatchLight}
+              swatchSelectedClass={editorStyles.fieldSwatchSelected}
+              disabled={disabled}
+            />
+          </div>
         </div>
         <textarea
-          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
-          rows={2}
+          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight} ${editorStyles.fieldTextareaSingleLine}`}
+          rows={1}
           value={cardPlace}
           disabled={disabled}
-          onChange={(e) => setCardPlace(clampFooterFieldToMaxLines(e.target.value))}
+          onChange={(e) => setCardPlace(clampDescriptionToMaxLines(e.target.value, FOOTER_FIELD_MAX_LINES))}
           autoComplete="off"
           spellCheck={false}
           placeholder="예: 캐롬클럽 빌리어즈"

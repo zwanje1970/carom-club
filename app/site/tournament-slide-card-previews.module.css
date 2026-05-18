@@ -1021,7 +1021,7 @@ article[data-editor-card-preview="1"] .classicLead,
 article[data-editor-card-preview="1"] .frameLead {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   overflow: hidden;
   word-break: break-word;
   white-space: normal;
@@ -1031,7 +1031,7 @@ article[data-editor-card-preview="1"] .classicDesc,
 article[data-editor-card-preview="1"] .frameDesc {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   white-space: normal;
 }
 
@@ -1200,6 +1200,39 @@ article[data-editor-card-preview="1"] .fullSurfaceFooterPlace {
 .cardRootArtboardPx:not(.cardRootTemplateLayout) .classicDescSecondary,
 .cardRootArtboardPx:not(.cardRootTemplateLayout) .frameDescSecondary {
   font-size: 13px;
+}
+
+/* 게시카드 편집기 v2: 전용 Pretendard + 자동 굵기(미리보기·캡처 동일) */
+article[data-card-editor-font="1"] .classicLead,
+article[data-card-editor-font="1"] .frameLead,
+article[data-card-editor-font="1"] .classicDesc,
+article[data-card-editor-font="1"] .frameDesc,
+article[data-card-editor-font="1"] .classicDescSecondary,
+article[data-card-editor-font="1"] .frameDescSecondary,
+article[data-card-editor-font="1"] .footerDate,
+article[data-card-editor-font="1"] .footerPlace,
+article[data-card-editor-font="1"] .fullSurfaceFooterDate,
+article[data-card-editor-font="1"] .fullSurfaceFooterPlace {
+  font-family: CaromCardEditorPretendard, ui-sans-serif, system-ui, sans-serif;
+  font-weight: var(--ce-body-weight, 300);
+  font-synthesis: none;
+}
+
+article[data-card-editor-font="1"] .classicTitle:not(.cardTitleWithLayeredOutline),
+article[data-card-editor-font="1"] .frameTitle:not(.cardTitleWithLayeredOutline) {
+  font-family: CaromCardEditorPretendard, ui-sans-serif, system-ui, sans-serif;
+  font-weight: var(--ce-title-weight, 700);
+  font-synthesis: none;
+}
+
+article[data-card-editor-font="1"] .cardTitleWithLayeredOutline.classicTitle .titleLayerStroke,
+article[data-card-editor-font="1"] .cardTitleWithLayeredOutline.classicTitle .titleLayerFill,
+article[data-card-editor-font="1"] .cardTitleWithLayeredOutline.frameTitle .titleLayerStroke,
+article[data-card-editor-font="1"] .cardTitleWithLayeredOutline.frameTitle .titleLayerFill,
+article[data-card-editor-font="1"] .titleOutlineSvgProbe {
+  font-family: CaromCardEditorPretendard, ui-sans-serif, system-ui, sans-serif;
+  font-weight: var(--ce-title-weight, 700) !important;
+  font-synthesis: none;
 }
 
 /* 게시 PNG(html2canvas): 글자 glyph만 숨김 — 배경·띠·배지 원·레이아웃 wrapper에는 적용하지 않음 */

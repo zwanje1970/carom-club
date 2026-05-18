@@ -1,10 +1,13 @@
 "use client";
 
 import { parse as parseOpenType } from "opentype.js/dist/opentype.mjs";
+import {
+  cardEditorOutlineFontFallbackUrl,
+  cardEditorOutlineFontUrl,
+  resolveCardEditorCssWeight,
+  type CardEditorNumericWeight,
+} from "./card-editor-fonts";
 import { logPlaceLayerDiagnosis } from "./preview-place-layer-diagnose";
-
-/** SVG path용 고정 폰트 — 시스템 UI 폰트와 무관, 캡처 시에만 네트워크 로드 */
-const OUTLINE_FONT_PUBLIC_URL = "/card-fonts/Pretendard-Regular.otf";
 
 type OpenTypeFont = {
   unitsPerEm: number;
@@ -38,23 +41,32 @@ type OutlineSnapshot = {
   paintOrder?: "stroke fill";
 };
 
-let cachedFontPromise: Promise<OpenTypeFont | null> | null = null;
+const outlineFontCache = new Map<CardEditorNumericWeight, Promise<OpenTypeFont | null>>();
 
-async function loadOutlineFont(): Promise<OpenTypeFont | null> {
-  if (!cachedFontPromise) {
-    cachedFontPromise = (async () => {
-      try {
-        const response = await fetch(OUTLINE_FONT_PUBLIC_URL);
-        if (!response.ok) return null;
-        const buffer = await response.arrayBuffer();
-        const parsed = parseOpenType(buffer) as unknown as OpenTypeFont;
-        return parsed;
-      } catch {
-        return null;
-      }
-    })();
+async function fetchParseFont(url: string): Promise<OpenTypeFont | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const buffer = await response.arrayBuffer();
+    return parseOpenType(buffer) as unknown as OpenTypeFont;
+  } catch {
+    return null;
   }
-  return cachedFontPromise;
+}
+
+/** computed `font-weight`에 맞는 정적 OTF — 편집기 미리보기와 동일 글리프 */
+async function loadOutlineFontForCssWeight(cssWeight: string): Promise<OpenTypeFont | null> {
+  const w = resolveCardEditorCssWeight(cssWeight);
+  let p = outlineFontCache.get(w);
+  if (!p) {
+    p = (async () => {
+      const primary = await fetchParseFont(cardEditorOutlineFontUrl(w));
+      if (primary) return primary;
+      return fetchParseFont(cardEditorOutlineFontFallbackUrl());
+    })();
+    outlineFontCache.set(w, p);
+  }
+  return p;
 }
 
 const ENABLE_PATH_LAYER_CHECK_LOG = process.env.NODE_ENV !== "production";
@@ -132,12 +144,14 @@ function extractOutlineSnapshots(cardRoot: HTMLElement): OutlineSnapshot[] {
   return mapped.filter((v): v is OutlineSnapshot => v !== null);
 }
 
-function buildPathLayerSvg(cardRoot: HTMLElement, font: OpenTypeFont, items: OutlineSnapshot[]): SVGSVGElement {
+function buildPathLayerSvg(
+  cardRoot: HTMLElement,
+  fontByWeight: Map<CardEditorNumericWeight, OpenTypeFont>,
+  items: OutlineSnapshot[],
+): SVGSVGElement {
   const rect = cardRoot.getBoundingClientRect();
   const width = Math.max(1, Math.round(rect.width * 1000) / 1000);
   const height = Math.max(1, Math.round(rect.height * 1000) / 1000);
-  const unitsPerEm = font.unitsPerEm || 1000;
-  const ascender = font.ascender || Math.round(unitsPerEm * 0.8);
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
@@ -153,13 +167,22 @@ function buildPathLayerSvg(cardRoot: HTMLElement, font: OpenTypeFont, items: Out
   svg.style.zIndex = "6";
   svg.style.overflow = "visible";
 
+  const pickFont = (item: OutlineSnapshot): OpenTypeFont | null => {
+    const w = resolveCardEditorCssWeight(item.fontWeight);
+    return fontByWeight.get(w) ?? fontByWeight.values().next().value ?? null;
+  };
+
   for (const item of items) {
+    const font = pickFont(item);
+    if (!font) continue;
+    const unitsPerEmItem = font.unitsPerEm || 1000;
+    const ascenderItem = font.ascender || Math.round(unitsPerEmItem * 0.8);
     const lines = item.text.split(/\r?\n/);
     lines.forEach((line, lineIndex) => {
       const sourceLine = line || " ";
       const widthPx = font.getAdvanceWidth(sourceLine, item.fontSize, { kerning: true });
       const xShift = item.textAnchor === "end" ? -widthPx : item.textAnchor === "middle" ? -(widthPx / 2) : 0;
-      const baselineY = item.y + item.lineHeight * lineIndex + (ascender / unitsPerEm) * item.fontSize;
+      const baselineY = item.y + item.lineHeight * lineIndex + (ascenderItem / unitsPerEmItem) * item.fontSize;
       const pathData = font.getPath(sourceLine, item.x + xShift, baselineY, item.fontSize, { kerning: true }).toPathData(3);
       if (!pathData.trim()) return;
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -190,12 +213,6 @@ export async function withCardPreviewTextPathLayer(args: {
 
   logPlaceLayerDiagnosis(cardRoot, "capture-before-path");
 
-  const font = await loadOutlineFont();
-  if (!font) {
-    await args.run();
-    return;
-  }
-
   const textItems = extractOutlineSnapshots(cardRoot);
   if (textItems.length === 0) {
     logCardPathLayerCheck("outline-items-empty");
@@ -203,7 +220,21 @@ export async function withCardPreviewTextPathLayer(args: {
     return;
   }
 
-  const pathSvg = buildPathLayerSvg(cardRoot, font, textItems);
+  const weightSet = new Set<CardEditorNumericWeight>();
+  for (const it of textItems) {
+    weightSet.add(resolveCardEditorCssWeight(it.fontWeight));
+  }
+  const fontByWeight = new Map<CardEditorNumericWeight, OpenTypeFont>();
+  for (const w of weightSet) {
+    const font = await loadOutlineFontForCssWeight(String(w));
+    if (font) fontByWeight.set(w, font);
+  }
+  if (fontByWeight.size === 0) {
+    await args.run();
+    return;
+  }
+
+  const pathSvg = buildPathLayerSvg(cardRoot, fontByWeight, textItems);
   const hiddenNodes: Array<{ node: HTMLElement; prevVisibility: string }> = [];
   const textNodes = Array.from(cardRoot.querySelectorAll<HTMLElement>('[data-outline-content-item="1"]'));
   logCardPathLayerCheck("before-hide", {

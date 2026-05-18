@@ -452,6 +452,31 @@
   outline-offset: 2px;
 }
 
+.fieldSwatchCompact {
+  width: 19px;
+  height: 19px;
+}
+
+.fieldHeadSwatchesPush {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fieldSwatchesRow12 {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .fieldLabel {
   font-size: 0.72rem;
   font-weight: 600;
@@ -518,6 +543,38 @@
 
 .fieldTextareaContentTight {
   font-size: calc(0.82rem - 1pt);
+}
+
+.fieldTextarea.fieldTextareaSingleLine {
+  resize: none;
+  min-height: 2.35rem;
+  max-height: 2.35rem;
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+  line-height: 1.35;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.fieldTextarea.fieldTextareaTitleSlot {
+  resize: vertical;
+  min-height: 2.35rem;
+  max-height: calc(2.35rem * 3 + 2px);
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+  line-height: 1.35;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.fieldTextarea.fieldTextareaDesc2 {
+  resize: vertical;
+  min-height: calc(2.35rem * 2 + 1px);
+  max-height: 12rem;
+  line-height: 1.35;
+  box-sizing: border-box;
 }
 
 .fieldFile {

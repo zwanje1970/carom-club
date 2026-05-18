@@ -275,6 +275,7 @@ function TournamentSlideCardPreview({
   onRepImageLoad,
   isImageCaptureMode = false,
   forceHeroImageCrossOrigin,
+  cardEditorTypography,
 }: {
   item: TournamentSlidePreviewItem;
   variant: SlidePreviewVariant;
@@ -298,6 +299,8 @@ function TournamentSlideCardPreview({
   /** true: 제목·부가·푸터·배지 글자만 숨김(레이아웃 유지) — html2canvas PNG용 */
   isImageCaptureMode?: boolean;
   forceHeroImageCrossOrigin?: boolean;
+  /** 게시카드 편집기 v2 전용 Pretendard + 자동 굵기(CSS 변수) */
+  cardEditorTypography?: { titleWeight: number; bodyWeight: number } | null;
 }) {
   const status = toStatus(item.statusBadge);
   const parsed = parseTournamentSlideCardSubtitleParts(item.subtitle);
@@ -344,6 +347,14 @@ function TournamentSlideCardPreview({
           : gradientPreset === "soft"
             ? styles.mediaGradientSoft
             : "";
+
+  const editorFontVars: CSSProperties | undefined =
+    cardEditorTypography != null
+      ? ({
+          ["--ce-title-weight" as never]: String(cardEditorTypography.titleWeight),
+          ["--ce-body-weight" as never]: String(cardEditorTypography.bodyWeight),
+        } as CSSProperties)
+      : undefined;
 
   const rootClass = [
     styles.cardRoot,
@@ -414,6 +425,8 @@ function TournamentSlideCardPreview({
         className={rootClass}
         data-tournament-card-capture-root="1"
         data-editor-card-preview={editorPreviewFixedLayout && !artboardPx ? "1" : undefined}
+        data-card-editor-font={cardEditorTypography ? "1" : undefined}
+        style={editorFontVars}
       >
         <MediaStack
           variant="classic"
@@ -513,6 +526,8 @@ function TournamentSlideCardPreview({
         className={rootClass}
         data-tournament-card-capture-root="1"
         data-editor-card-preview={editorPreviewFixedLayout && !artboardPx ? "1" : undefined}
+        data-card-editor-font={cardEditorTypography ? "1" : undefined}
+        style={editorFontVars}
       >
         <MediaStack
           variant="frame"
@@ -630,6 +645,7 @@ export function TournamentSnapshotCardView({
   isImageCaptureMode = false,
   suppressLink = false,
   forceHeroImageCrossOrigin,
+  cardEditorTypography,
 }: {
   item: SlideDeckItem;
   slideDeck?: boolean;
@@ -649,6 +665,8 @@ export function TournamentSnapshotCardView({
   suppressLink?: boolean;
   /** 편집 미리보기: 히어로 배경 img에 crossOrigin(캡처 시 CORS) */
   forceHeroImageCrossOrigin?: boolean;
+  /** 게시카드 편집기 v2: 전용 폰트 스택 + 자동 굵기(CSS 변수) */
+  cardEditorTypography?: { titleWeight: number; bodyWeight: number } | null;
 }) {
   const previewItem = slideDeckItemToPreviewItem(item);
   const variant: SlidePreviewVariant = item.cardTemplate === "B" ? "frame" : "classic";
@@ -670,6 +688,7 @@ export function TournamentSnapshotCardView({
       onRepImageLoad={onRepImageLoad}
       isImageCaptureMode={isImageCaptureMode}
       forceHeroImageCrossOrigin={forceHeroImageCrossOrigin}
+      cardEditorTypography={cardEditorTypography}
     />
   );
   if (!href || suppressLink) return inner;

@@ -85,12 +85,15 @@ const CardPublishPreviewInner = forwardRef<
     editorFooterPlaceTextColor: string;
     isImageCaptureMode?: boolean;
   }
->(function CardPublishPreviewInner({
-  model,
-  editorFooterDateTextColor,
-  editorFooterPlaceTextColor,
-  isImageCaptureMode = false,
-}, ref) {
+>(function CardPublishPreviewInner(
+  {
+    model,
+    editorFooterDateTextColor,
+    editorFooterPlaceTextColor,
+    isImageCaptureMode = false,
+  },
+  ref,
+) {
   const item = useMemo(
     () =>
       slideItemFromModel(model, {
@@ -99,6 +102,17 @@ const CardPublishPreviewInner = forwardRef<
       }),
     [model, editorFooterDateTextColor, editorFooterPlaceTextColor],
   );
+
+  const cardEditorTypography = useMemo(() => {
+    const e = model.slideTitleEffect ?? "none";
+    const outlineAccent = e === "outline" || e === "shadow_outline";
+    return {
+      /** Bold / ExtraBold OTF */
+      titleWeight: outlineAccent ? 800 : 700,
+      /** Light / Medium OTF */
+      bodyWeight: outlineAccent ? 500 : 300,
+    };
+  }, [model.slideTitleEffect]);
 
   useLayoutEffect(() => {
     const root = typeof ref === "function" ? null : ref?.current;
@@ -135,6 +149,7 @@ const CardPublishPreviewInner = forwardRef<
         repImageHighPriority={Boolean(model.slideImage320Url?.trim())}
         slideDeckSolidBackdrop={SLIDE_DECK_SOLID_BACKDROPS[0]}
         isImageCaptureMode={isImageCaptureMode}
+        cardEditorTypography={cardEditorTypography}
       />
     </div>
   );
