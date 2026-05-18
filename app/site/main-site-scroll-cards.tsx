@@ -1009,9 +1009,14 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
           : Math.max(maxScrollTop, 1);
       const loopEnd = hasOffsetLoopWindow ? secondStart : firstStart + loopDistance;
       const carryBefore = scrollPixelCarryRef.current;
-      const deltaTotal = pxPerSec * dtSec + carryBefore;
-      scrollPixelCarryRef.current = deltaTotal % 1;
       const useTransformDiag = isMainScrollUseTransformDiagEnabled();
+      const rawDtSec = dtSec;
+      const rawDeltaTotal = pxPerSec * rawDtSec + carryBefore;
+      /** transform 검증: RAF dtSec 변동 대신 고정 프레임 간격으로 이동량 계산 */
+      const fixedFrameSec = 1 / 60;
+      const fixedDeltaTotal = pxPerSec * fixedFrameSec + carryBefore;
+      const deltaTotal = useTransformDiag ? fixedDeltaTotal : rawDeltaTotal;
+      scrollPixelCarryRef.current = deltaTotal % 1;
       const currentScrollValue = useTransformDiag ? mainScrollVirtualOffsetRef.current : node.scrollTop;
       let nextScrollTop = currentScrollValue + deltaTotal;
       let wrapSubtractions = 0;
@@ -1085,7 +1090,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             rafStartedAt: mainShakeRafStartedAtRef.current,
             rafRestartCount: mainShakeRafEffectRunCountRef.current,
             pxPerSec,
-            dtSec,
+            dtSec: rawDtSec,
             deltaTotal,
             carryAfter: scrollPixelCarryRef.current,
             firstStart,
@@ -1094,6 +1099,15 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
             scrollApplyMode: useTransformDiag ? "transform" : "scrollTop",
             transformRoundedOffset: useTransformDiag ? Math.round(appliedScrollTop) : null,
             transformOffset: useTransformDiag ? Number(appliedScrollTop.toFixed(3)) : null,
+            ...(useTransformDiag
+              ? {
+                  scrollMotionTimingMode: "fixed-60fps",
+                  rawDtSec,
+                  fixedFrameSec,
+                  rawDeltaTotal,
+                  fixedDeltaTotal,
+                }
+              : {}),
           },
         });
       }
