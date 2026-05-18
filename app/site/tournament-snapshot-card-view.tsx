@@ -6,6 +6,7 @@ import { useCallback, useLayoutEffect, useRef } from "react";
 import type { TournamentCardOverlaySnapshot } from "../../lib/site/tournament-card-overlay-snapshot";
 import { TournamentStatusBadge, type TournamentPostStatus } from "./tournament-slide-card-status-badge";
 import { logCardColorDiagStyleObjects } from "../../lib/preview-card-footer-color-diagnose";
+import { parseTournamentSlideCardSubtitleParts } from "../../lib/tournament-slide-card-subtitle";
 import styles from "./tournament-slide-card-previews.module.css";
 
 /* 편집기 미리보기·게시 PNG(html2canvas) 입력용 HTML 렌더 — /site 메인 세로 덱은 평면화된 게시 PNG 1장(`MainSiteScrollCards`)만 표시(글자·배지 HTML 레이어 없음). 둥근 모서리는 카드 컨테이너(border-radius+overflow)가 담당. 디자인 좌표 440×180 아트보드(`slideDeckAspectFill`). */
@@ -130,16 +131,6 @@ function slideDeckItemToPreviewItem(item: SlideDeckItem): TournamentSlidePreview
     cardFooterDateTextColor: item.cardFooterDateTextColor,
     cardFooterPlaceTextColor: item.cardFooterPlaceTextColor,
   };
-}
-
-function parseSubtitle(subtitle: string): { dateText: string; placeText: string } {
-  const parts = subtitle
-    .split("·")
-    .map((v) => v.trim())
-    .filter((v) => v.length > 0);
-  if (parts.length === 0) return { dateText: "-", placeText: "-" };
-  if (parts.length === 1) return { dateText: parts[0], placeText: "-" };
-  return { dateText: parts[0], placeText: parts.slice(1).join(" · ") };
 }
 
 function toStatus(value: string | undefined): TournamentPostStatus {
@@ -309,7 +300,7 @@ function TournamentSlideCardPreview({
   forceHeroImageCrossOrigin?: boolean;
 }) {
   const status = toStatus(item.statusBadge);
-  const parsed = parseSubtitle(item.subtitle);
+  const parsed = parseTournamentSlideCardSubtitleParts(item.subtitle);
   const lead = item.cardExtraLine1 ?? "";
   const description = item.cardExtraLine2 ?? "";
   const description2 = item.cardExtraLine3 ?? "";
@@ -375,18 +366,16 @@ function TournamentSlideCardPreview({
     .join(" ");
 
   const layoutStableSlots = editorPreviewFixedLayout || artboardPx;
-  const leadText = lead.trim();
-  const descText = description.trim();
-  const desc2Text = description2.trim();
-  const showLeadBlock = layoutStableSlots || leadText.length > 0;
-  const showDescBlock = layoutStableSlots || descText.length > 0;
-  const showDesc2Block = layoutStableSlots || desc2Text.length > 0;
-  const leadDisplay = layoutStableSlots && !leadText ? "\u00a0" : lead;
-  const descDisplay = layoutStableSlots && !descText ? "\u00a0" : description;
-  const desc2Display = layoutStableSlots && !desc2Text ? "\u00a0" : description2;
+  const showLeadBlock = layoutStableSlots || lead.length > 0;
+  const showDescBlock = layoutStableSlots || description.length > 0;
+  const showDesc2Block = layoutStableSlots || description2.length > 0;
+  const leadDisplay = layoutStableSlots && lead.length === 0 ? "\u00a0" : lead;
+  const descDisplay = layoutStableSlots && description.length === 0 ? "\u00a0" : description;
+  const desc2Display = layoutStableSlots && description2.length === 0 ? "\u00a0" : description2;
 
   const splitDateStyle = footerDateColor ? { color: footerDateColor } : undefined;
   const splitPlaceStyle = footerPlaceColor ? { color: footerPlaceColor } : undefined;
+  const titleDisplay = item.title.trim().length === 0 ? "(제목)" : item.title;
 
   if (editorPreviewFixedLayout) {
     logCardColorDiagStyleObjects(splitDateStyle, splitPlaceStyle, {
@@ -457,23 +446,36 @@ function TournamentSlideCardPreview({
                   ) : null}
                   <h3
                     data-tournament-card-overlay="title"
-                    data-outline-content-item="1"
-                    data-title-outline-enabled={useLayeredTitleOutline ? "1" : undefined}
-                    data-title-outline-color={useLayeredTitleOutline ? titleOutlineColor : undefined}
-                    className={`${styles.classicTitle} ${captureHideGlyphClass}`.trim()}
-                    style={titleColor ? { color: titleColor } : undefined}
+                    {...(!useLayeredTitleOutline ? { "data-outline-content-item": "1" as const } : {})}
+                    className={`${styles.classicTitle} ${useLayeredTitleOutline ? styles.cardTitleWithLayeredOutline : ""} ${captureHideGlyphClass}`.trim()}
+                    style={!useLayeredTitleOutline && titleColor ? { color: titleColor } : undefined}
                   >
                     {useLayeredTitleOutline ? (
-                      <span className={styles.titleLayerWrap}>
-                        <span className={styles.titleLayerStroke} aria-hidden>
-                          {item.title.length > 0 ? item.title : "(제목)"}
+                      <>
+                        <span className={styles.titleLayerWrap}>
+                          <span className={styles.titleLayerStroke} aria-hidden>
+                            {titleDisplay}
+                          </span>
+                          <span
+                            className={styles.titleLayerFill}
+                            style={titleColor ? { color: titleColor } : undefined}
+                          >
+                            {titleDisplay}
+                          </span>
                         </span>
-                        <span className={styles.titleLayerFill}>
-                          {item.title.length > 0 ? item.title : "(제목)"}
+                        <span
+                          className={styles.titleOutlineSvgProbe}
+                          aria-hidden
+                          data-outline-content-item="1"
+                          data-title-outline-enabled="1"
+                          data-title-outline-color={titleOutlineColor}
+                          style={titleColor ? { color: titleColor } : undefined}
+                        >
+                          {titleDisplay}
                         </span>
-                      </span>
+                      </>
                     ) : (
-                      item.title.length > 0 ? item.title : "(제목)"
+                      titleDisplay
                     )}
                   </h3>
                   {showDescBlock ? (
@@ -542,23 +544,36 @@ function TournamentSlideCardPreview({
                 ) : null}
                 <h3
                   data-tournament-card-overlay="title"
-                  data-outline-content-item="1"
-                  data-title-outline-enabled={useLayeredTitleOutline ? "1" : undefined}
-                  data-title-outline-color={useLayeredTitleOutline ? titleOutlineColor : undefined}
-                  className={`${styles.frameTitle} ${captureHideGlyphClass}`.trim()}
-                  style={titleColor ? { color: titleColor } : undefined}
+                  {...(!useLayeredTitleOutline ? { "data-outline-content-item": "1" as const } : {})}
+                  className={`${styles.frameTitle} ${useLayeredTitleOutline ? styles.cardTitleWithLayeredOutline : ""} ${captureHideGlyphClass}`.trim()}
+                  style={!useLayeredTitleOutline && titleColor ? { color: titleColor } : undefined}
                 >
                   {useLayeredTitleOutline ? (
-                    <span className={styles.titleLayerWrap}>
-                      <span className={styles.titleLayerStroke} aria-hidden>
-                        {item.title.length > 0 ? item.title : "(제목)"}
+                    <>
+                      <span className={styles.titleLayerWrap}>
+                        <span className={styles.titleLayerStroke} aria-hidden>
+                          {titleDisplay}
+                        </span>
+                        <span
+                          className={styles.titleLayerFill}
+                          style={titleColor ? { color: titleColor } : undefined}
+                        >
+                          {titleDisplay}
+                        </span>
                       </span>
-                      <span className={styles.titleLayerFill}>
-                        {item.title.length > 0 ? item.title : "(제목)"}
+                      <span
+                        className={styles.titleOutlineSvgProbe}
+                        aria-hidden
+                        data-outline-content-item="1"
+                        data-title-outline-enabled="1"
+                        data-title-outline-color={titleOutlineColor}
+                        style={titleColor ? { color: titleColor } : undefined}
+                      >
+                        {titleDisplay}
                       </span>
-                    </span>
+                    </>
                   ) : (
-                    item.title.length > 0 ? item.title : "(제목)"
+                    titleDisplay
                   )}
                 </h3>
                 {showDescBlock ? (

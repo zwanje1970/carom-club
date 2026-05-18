@@ -21,13 +21,20 @@ export function parseTournamentSlideCardSubtitleParts(subtitle: string): {
   dateText: string;
   placeText: string;
 } {
-  const parts = subtitle
-    .split("·")
-    .map((v) => v.trim())
-    .filter((v) => v.length > 0);
-  if (parts.length === 0) return { dateText: "-", placeText: "-" };
-  if (parts.length === 1) return { dateText: parts[0] ?? "-", placeText: "-" };
-  return { dateText: parts[0] ?? "-", placeText: parts.slice(1).join(" · ") };
+  const raw = subtitle ?? "";
+  const idx = raw.indexOf("·");
+  if (idx < 0) {
+    if (raw.trim() === "") return { dateText: "-", placeText: "-" };
+    return { dateText: raw, placeText: "-" };
+  }
+  const dateText = raw.slice(0, idx);
+  const placeText = raw.slice(idx + 1);
+  const dateEmpty = dateText.trim() === "";
+  const placeEmpty = placeText.trim() === "";
+  if (dateEmpty && placeEmpty) return { dateText: "-", placeText: "-" };
+  if (dateEmpty) return { dateText: "-", placeText };
+  if (placeEmpty) return { dateText, placeText: "-" };
+  return { dateText, placeText };
 }
 
 export function buildTournamentPublishedCardSubtitle(params: {

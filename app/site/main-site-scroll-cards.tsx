@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { KeyboardEvent, PointerEvent, Ref } from "react";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import styles from "./main-sample/main-sample.module.css";
 import siteStyles from "./main-site-scroll-cards.module.css";
 import deckShellStyles from "./main-site-scroll-tournament-deck-shell.module.css";
@@ -12,6 +12,11 @@ import {
   logMainCardImage,
 } from "../../lib/site/main-card-image-preload-diag";
 import { isMainSiteLoadDiagEnabled, logMainSiteLoadDiag } from "../../lib/site/main-site-load-diag";
+import {
+  isMainScrollShakeDiagEnabled,
+  maybeLogMainScrollShakeFrame,
+  resetMainScrollShakeDiagSession,
+} from "../../lib/site/main-scroll-shake-diag";
 
 function logMainCardReturnDiag(payload: Record<string, unknown>) {
   const args: unknown[] = ["[main-card-return-diag]"];
@@ -420,6 +425,11 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const sessionRestoreAppliedRef = useRef(false);
   /** `pxPerSec * dt` + carry; 매 프레임 `deltaTotal % 1`을 다음 carry로 유지 */
   const scrollPixelCarryRef = useRef(0);
+  /** [main-shake-diag] 마키 RAF effect 재실행 횟수 */
+  const mainShakeRafEffectRunCountRef = useRef(0);
+  const mainShakePrevCardTopRef = useRef<number | null>(null);
+  const mainShakePrevCardLeftRef = useRef<number | null>(null);
+  const mainShakeRafStartedAtRef = useRef<number | null>(null);
 
   const lcpHeroItemIndex = useMemo(
     () => renderItems.findIndex((x) => Boolean(x.imageUrl?.trim())),
@@ -815,6 +825,14 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     if (items.length === 0) return;
     if (!autoSlideReady) return;
 
+    if (isMainScrollShakeDiagEnabled()) {
+      mainShakeRafEffectRunCountRef.current += 1;
+      resetMainScrollShakeDiagSession();
+      mainShakePrevCardTopRef.current = null;
+      mainShakePrevCardLeftRef.current = null;
+      mainShakeRafStartedAtRef.current = null;
+    }
+
     logMainCardReturnDiag({
       phase: "marquee-raf-effect-start",
       path: typeof window !== "undefined" ? window.location.pathname : "",
@@ -945,19 +963,89 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       const carryBefore = scrollPixelCarryRef.current;
       const deltaTotal = pxPerSec * dtSec + carryBefore;
       scrollPixelCarryRef.current = deltaTotal % 1;
-      let nextScrollTop = node.scrollTop + deltaTotal;
+      const currentScrollValue = node.scrollTop;
+      let nextScrollTop = currentScrollValue + deltaTotal;
+      let wrapSubtractions = 0;
       while (nextScrollTop >= loopEnd && loopDistance > 0) {
         nextScrollTop -= loopDistance;
+        wrapSubtractions += 1;
       }
       /**
        * 루프 보정 후 좌표가 상단 리드인(spacer)으로 떨어지지 않도록
        * 카드 세그먼트 시작점 이상으로 고정.
        */
+      let lowBranchApplied = false;
       if (loopDistance > 0 && nextScrollTop < firstStart) {
+        lowBranchApplied = true;
         nextScrollTop = firstStart + ((nextScrollTop - firstStart) % loopDistance + loopDistance) % loopDistance;
       }
 
       const appliedScrollTop = Math.min(nextScrollTop, maxScrollTop);
+      const appliedMoveValue = appliedScrollTop - currentScrollValue;
+      const isWrapped = wrapSubtractions > 0 || lowBranchApplied;
+
+      if (isMainScrollShakeDiagEnabled()) {
+        const trackEl = trackRef.current;
+        const transformValue =
+          trackEl && typeof getComputedStyle !== "undefined" ? getComputedStyle(trackEl).transform : "(none)";
+        const cardEl = primarySegmentRef.current?.querySelector(`[${SITE_SCROLL_CARD}]`) as HTMLElement | null;
+        const rect = cardEl?.getBoundingClientRect();
+        const imgEl = primarySegmentRef.current?.querySelector(
+          "img[data-site-scroll-deck-img]",
+        ) as HTMLImageElement | null;
+        const cardTop = rect ? rect.top : null;
+        const cardLeft = rect ? rect.left : null;
+        const cardWidth = rect?.width ?? null;
+        const cardHeight = rect?.height ?? null;
+        const prevTop = mainShakePrevCardTopRef.current;
+        const prevLeft = mainShakePrevCardLeftRef.current;
+        const deltaTopFromPrevFrame =
+          prevTop !== null && cardTop !== null ? cardTop - prevTop : null;
+        const deltaLeftFromPrevFrame =
+          prevLeft !== null && cardLeft !== null ? cardLeft - prevLeft : null;
+        if (cardTop !== null) mainShakePrevCardTopRef.current = cardTop;
+        if (cardLeft !== null) mainShakePrevCardLeftRef.current = cardLeft;
+        const hasFractionalTop =
+          cardTop !== null ? Math.abs(cardTop - Math.round(cardTop)) > 0.012 : null;
+        const hasFractionalTransform =
+          transformValue !== "none" && /\.[0-9]+/.test(transformValue);
+
+        maybeLogMainScrollShakeFrame({
+          frameTime,
+          forceLog: isWrapped,
+          payload: {
+            currentScrollValue,
+            nextScrollValue: nextScrollTop,
+            appliedMoveValue,
+            transformValue,
+            segmentHeight,
+            loopDistance,
+            isWrapped,
+            wrapSubtractions,
+            lowBranchApplied,
+            cardTop,
+            cardLeft,
+            cardWidth,
+            cardHeight,
+            deltaTopFromPrevFrame,
+            deltaLeftFromPrevFrame,
+            hasFractionalTop,
+            hasFractionalTransform,
+            imageComplete: imgEl ? imgEl.complete : null,
+            imageCurrentSrc: imgEl ? (imgEl.currentSrc || imgEl.src || "").slice(0, 160) : null,
+            rafStartedAt: mainShakeRafStartedAtRef.current,
+            rafRestartCount: mainShakeRafEffectRunCountRef.current,
+            pxPerSec,
+            dtSec,
+            deltaTotal,
+            carryAfter: scrollPixelCarryRef.current,
+            firstStart,
+            loopEnd,
+            maxScrollTop,
+          },
+        });
+      }
+
       // programmatic scrollTop 변경 직후 발생하는 scroll 이벤트를 사용자 입력으로 오인하지 않도록 보호
       programmaticScrollUntilMsRef.current = performance.now() + 160;
       node.scrollTop = appliedScrollTop;
@@ -971,6 +1059,9 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       if (rafRef.current !== null) return;
       lastFrameTimeRef.current = null;
       scrollPixelCarryRef.current = 0;
+      if (isMainScrollShakeDiagEnabled()) {
+        mainShakeRafStartedAtRef.current = performance.now();
+      }
       rafRef.current = requestAnimationFrame(step);
     };
 
@@ -1040,11 +1131,42 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     };
   }, [itemsIdsKey, items.length, slideCardMoveSpeedLevel, selectedItemId, autoSlideReady]);
 
+  const showMainShakeDiagCopyButton = isMainScrollShakeDiagEnabled();
+
   if (items.length === 0) {
     return (
-      <div className={styles.slideViewportSiteMain} data-no-root-swipe data-site-main-scroll-viewport="1">
-        <p className={styles.sampleMainEmpty}>등록된 메인 카드가 없습니다.</p>
-      </div>
+      <Fragment>
+        <div className={styles.slideViewportSiteMain} data-no-root-swipe data-site-main-scroll-viewport="1">
+          <p className={styles.sampleMainEmpty}>등록된 메인 카드가 없습니다.</p>
+        </div>
+        {showMainShakeDiagCopyButton ? (
+          <button
+            type="button"
+            aria-label="떨림 로그 복사"
+            onClick={() => {
+              const fn =
+                typeof window !== "undefined" ? window.__COPY_MAIN_SHAKE_DIAG__ : undefined;
+              if (fn) void fn();
+            }}
+            style={{
+              position: "fixed",
+              right: 10,
+              bottom: 10,
+              zIndex: 99999,
+              padding: "6px 10px",
+              fontSize: 12,
+              lineHeight: 1.2,
+              cursor: "pointer",
+              borderRadius: 6,
+              border: "1px solid rgba(0,0,0,0.2)",
+              background: "rgba(255,255,255,0.92)",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+            }}
+          >
+            떨림 로그 복사
+          </button>
+        ) : null}
+      </Fragment>
     );
   }
 
@@ -1083,23 +1205,51 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   );
 
   return (
-    <div
-      className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
-      data-no-root-swipe
-      data-site-main-scroll-viewport="1"
-      data-site-main-scroll-deck="1"
-      ref={viewportRef}
-    >
+    <Fragment>
       <div
-        ref={trackRef}
-        className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}
+        className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
+        data-no-root-swipe
+        data-site-main-scroll-viewport="1"
+        data-site-main-scroll-deck="1"
+        ref={viewportRef}
       >
-        {renderSegment("a", primarySegmentRef)}
-        {renderSegment("b", secondarySegmentRef)}
-        {selectedItemId !== null ? (
-          <div className={siteStyles.trackDimOverlay} aria-hidden />
-        ) : null}
+        <div
+          ref={trackRef}
+          className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}
+        >
+          {renderSegment("a", primarySegmentRef)}
+          {renderSegment("b", secondarySegmentRef)}
+          {selectedItemId !== null ? (
+            <div className={siteStyles.trackDimOverlay} aria-hidden />
+          ) : null}
+        </div>
       </div>
-    </div>
+      {showMainShakeDiagCopyButton ? (
+        <button
+          type="button"
+          aria-label="떨림 로그 복사"
+          onClick={() => {
+            const fn = typeof window !== "undefined" ? window.__COPY_MAIN_SHAKE_DIAG__ : undefined;
+            if (fn) void fn();
+          }}
+          style={{
+            position: "fixed",
+            right: 10,
+            bottom: 10,
+            zIndex: 99999,
+            padding: "6px 10px",
+            fontSize: 12,
+            lineHeight: 1.2,
+            cursor: "pointer",
+            borderRadius: 6,
+            border: "1px solid rgba(0,0,0,0.2)",
+            background: "rgba(255,255,255,0.92)",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+          }}
+        >
+          떨림 로그 복사
+        </button>
+      ) : null}
+    </Fragment>
   );
 }

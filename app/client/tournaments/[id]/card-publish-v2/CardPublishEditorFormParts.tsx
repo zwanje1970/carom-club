@@ -303,10 +303,25 @@ export const CardPublishBackgroundTab = memo(function CardPublishBackgroundTab({
 });
 
 const DESCRIPTION_MAX_LINES = 3;
+const TITLE_MAX_LINES = 8;
+const LEAD_MAX_LINES = 4;
+const FOOTER_FIELD_MAX_LINES = 6;
 
 function clampDescriptionToMaxLines(value: string, maxLines: number): string {
   const lines = value.split(/\r?\n/);
   return lines.slice(0, maxLines).join("\n");
+}
+
+function clampTitleToMaxLines(value: string): string {
+  return clampDescriptionToMaxLines(value, TITLE_MAX_LINES);
+}
+
+function clampLeadToMaxLines(value: string): string {
+  return clampDescriptionToMaxLines(value, LEAD_MAX_LINES);
+}
+
+function clampFooterFieldToMaxLines(value: string): string {
+  return clampDescriptionToMaxLines(value, FOOTER_FIELD_MAX_LINES);
 }
 
 export const CardPublishContentTab = memo(function CardPublishContentTab({
@@ -379,20 +394,21 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
             disabled={disabled}
           />
         </div>
-        <input
-          className={editorStyles.fieldInput}
-          type="text"
+        <textarea
+          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
+          rows={2}
           value={textLine1}
           disabled={disabled}
-          onChange={(e) => setTextLine1(e.target.value)}
+          onChange={(e) => setTextLine1(clampLeadToMaxLines(e.target.value))}
           autoComplete="off"
+          spellCheck={false}
           placeholder="비우면 표시 안 함"
         />
       </div>
 
       <div className={editorStyles.field}>
         <div className={editorStyles.fieldHead}>
-          <span className={editorStyles.fieldLabel}>제목 (1줄)</span>
+          <span className={editorStyles.fieldLabel}>제목</span>
           <TextColorSwatches
             value={titleTextColor}
             onChange={setTitleTextColor}
@@ -403,12 +419,12 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
             disabled={disabled}
           />
         </div>
-        <input
-          className={editorStyles.fieldInput}
-          type="text"
+        <textarea
+          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
+          rows={3}
           value={title}
           disabled={disabled}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => setTitle(clampTitleToMaxLines(e.target.value))}
           autoComplete="off"
           spellCheck={false}
         />
@@ -451,13 +467,14 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
             disabled={disabled}
           />
         </div>
-        <input
-          className={`${editorStyles.fieldInput} ${editorStyles.fieldInputContentTight}`}
-          type="text"
+        <textarea
+          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
+          rows={2}
           value={cardDate}
           disabled={disabled}
-          onChange={(e) => setCardDate(e.target.value)}
+          onChange={(e) => setCardDate(clampFooterFieldToMaxLines(e.target.value))}
           autoComplete="off"
+          spellCheck={false}
           placeholder="예: 2026-05-09 (일)"
         />
       </div>
@@ -475,13 +492,14 @@ export const CardPublishContentTab = memo(function CardPublishContentTab({
             disabled={disabled}
           />
         </div>
-        <input
-          className={`${editorStyles.fieldInput} ${editorStyles.fieldInputContentTight}`}
-          type="text"
+        <textarea
+          className={`${editorStyles.fieldInput} ${editorStyles.fieldTextarea} ${editorStyles.fieldTextareaContentTight}`}
+          rows={2}
           value={cardPlace}
           disabled={disabled}
-          onChange={(e) => setCardPlace(e.target.value)}
+          onChange={(e) => setCardPlace(clampFooterFieldToMaxLines(e.target.value))}
           autoComplete="off"
+          spellCheck={false}
           placeholder="예: 캐롬클럽 빌리어즈"
         />
       </div>

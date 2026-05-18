@@ -327,8 +327,14 @@ export default function ClientTournamentCardPublishV2Page() {
   const DEFAULT_PREVIEW_MEDIA_BG = "#0f2747";
 
   const previewModel: CardPublishPreviewModel = useMemo(() => {
-    const datePart = formatCardDateForDisplay(cardDate) || cardDate.trim() || "-";
-    const placePart = venueNameOnly(cardPlace) || "-";
+    const dateFormatted = formatCardDateForDisplay(cardDate);
+    const datePart =
+      dateFormatted !== ""
+        ? dateFormatted
+        : cardDate.trim() === ""
+          ? "-"
+          : cardDate;
+    const placePart = cardPlace.trim() === "" ? "-" : cardPlace;
     const subtitle = `${datePart} · ${placePart}`;
     const previewImageSrc = captureImageSrc.trim() || uploadedImage?.w320Url;
     const noBgImage = !previewImageSrc;
@@ -339,7 +345,7 @@ export default function ClientTournamentCardPublishV2Page() {
     const tc = titleTextColor.trim();
     const dc = descriptionTextColor.trim();
     return {
-      slideTitle: title.length > 0 ? title : "(제목)",
+      slideTitle: title.trim().length === 0 ? "(제목)" : title,
       slideSubtitle: subtitle.length ? subtitle : "·",
       slideStatusBadge: publishIntent === "recruiting" ? "모집중" : "임시저장",
       slideExtra1: textLine1.length > 0 ? textLine1 : null,
@@ -414,26 +420,29 @@ export default function ClientTournamentCardPublishV2Page() {
 
   useEffect(() => {
     return () => {
-      if (captureImageObjectUrlRef.current) {
-        URL.revokeObjectURL(captureImageObjectUrlRef.current);
-        captureImageObjectUrlRef.current = null;
+      const prev = captureImageObjectUrlRef.current;
+      if (prev && prev.startsWith("blob:")) {
+        URL.revokeObjectURL(prev);
       }
+      captureImageObjectUrlRef.current = null;
     };
   }, []);
 
   function clearCaptureImageSource(): void {
-    if (captureImageObjectUrlRef.current) {
-      URL.revokeObjectURL(captureImageObjectUrlRef.current);
-      captureImageObjectUrlRef.current = null;
+    const prev = captureImageObjectUrlRef.current;
+    if (prev && prev.startsWith("blob:")) {
+      URL.revokeObjectURL(prev);
     }
+    captureImageObjectUrlRef.current = null;
     setCaptureImageSrc("");
   }
 
   function setCaptureImageObjectUrl(nextUrl: string): void {
-    if (captureImageObjectUrlRef.current) {
-      URL.revokeObjectURL(captureImageObjectUrlRef.current);
+    const prev = captureImageObjectUrlRef.current;
+    if (prev && prev.startsWith("blob:")) {
+      URL.revokeObjectURL(prev);
     }
-    captureImageObjectUrlRef.current = nextUrl;
+    captureImageObjectUrlRef.current = nextUrl.startsWith("blob:") ? nextUrl : null;
     setCaptureImageSrc(nextUrl);
   }
 
@@ -455,11 +464,28 @@ export default function ClientTournamentCardPublishV2Page() {
     if (backgroundType !== "image" || !uploadedImage) return true;
     if (isBrowserLocalImageSrc(captureImageSrc)) return true;
 
-    const localUrl = await createLocalObjectUrlFromStoredImage(uploadedImage.w640Url || uploadedImage.w320Url);
-    if (!localUrl) return false;
-    setCaptureImageObjectUrl(localUrl);
-    await waitForNextPaint();
-    return true;
+    const w320 = (uploadedImage.w320Url ?? "").trim();
+    const w640 = (uploadedImage.w640Url ?? "").trim();
+    const preferredStored = (w640 || w320).trim();
+    const cur = captureImageSrc.trim();
+    if (preferredStored && (cur === w320 || cur === w640)) {
+      return true;
+    }
+
+    const localUrl = await createLocalObjectUrlFromStoredImage(preferredStored);
+    if (localUrl) {
+      setCaptureImageObjectUrl(localUrl);
+      await waitForNextPaint();
+      return true;
+    }
+
+    if (preferredStored) {
+      setCaptureImageObjectUrl(preferredStored);
+      await waitForNextPaint();
+      return true;
+    }
+
+    return false;
   }
 
   const loadSnapshots = useCallback(async () => {
@@ -501,7 +527,7 @@ export default function ClientTournamentCardPublishV2Page() {
             : null;
       if (pick) {
         const snapRaw = pick.title ?? "";
-        setTitle(snapRaw.trim() && snapRaw.trim() !== "(제목)" ? snapRaw : t.title);
+        setTitle(snapRaw !== "" && snapRaw.trim() !== "(제목)" ? snapRaw : t.title);
         const fromPick1 = pick.cardExtraLine1 ?? "";
         const fromPick2 = pick.cardExtraLine2 ?? "";
         setTextLine1(fromPick1 || summaryLine1);
@@ -578,14 +604,14 @@ export default function ClientTournamentCardPublishV2Page() {
           setMediaBackground("");
           setImageOverlayOpacity(DEFAULT_BG_IMAGE_OVERLAY_OPACITY);
         }
-        const storedDate =
-          typeof pick.tournamentCardDisplayDate === "string" ? pick.tournamentCardDisplayDate.trim() : "";
-        const dRaw = storedDate || (typeof t.date === "string" ? t.date : "");
-        const storedLoc =
-          typeof pick.tournamentCardDisplayLocation === "string" ? pick.tournamentCardDisplayLocation.trim() : "";
-        const locRaw = storedLoc || (typeof t.location === "string" ? t.location : "");
-        setCardDate(dRaw ? formatCardDateForDisplay(dRaw) : "");
-        setCardPlace(locRaw ? venueNameOnly(locRaw) : "");
+        const hasStoredDate = typeof pick.tournamentCardDisplayDate === "string";
+        const storedDate = hasStoredDate ? pick.tournamentCardDisplayDate : undefined;
+        const dRaw = typeof t.date === "string" ? t.date : "";
+        setCardDate(hasStoredDate ? (storedDate as string) : dRaw ? formatCardDateForDisplay(dRaw) : "");
+        const hasStoredLoc = typeof pick.tournamentCardDisplayLocation === "string";
+        const storedLoc = hasStoredLoc ? pick.tournamentCardDisplayLocation : undefined;
+        const locRaw = typeof t.location === "string" ? t.location : "";
+        setCardPlace(hasStoredLoc ? (storedLoc as string) : locRaw ? venueNameOnly(locRaw) : "");
       } else {
         setTitle(t.title);
         const sum1 = summaryLine1.trim();
@@ -667,6 +693,7 @@ export default function ClientTournamentCardPublishV2Page() {
   function buildCardPayload(draftOnly: boolean): { ok: true; body: Record<string, unknown> } | { ok: false; error: string } {
     if (!tournamentId.trim()) return { ok: false, error: "대회 정보가 없습니다." };
     if (!title.trim()) return { ok: false, error: "제목을 입력해 주세요." };
+    const formattedDate = formatCardDateForDisplay(cardDate);
     const body: Record<string, unknown> = {
       tournamentId,
       title,
@@ -679,8 +706,9 @@ export default function ClientTournamentCardPublishV2Page() {
       imageId: uploadedImage?.imageId ?? "",
       image320Url: uploadedImage?.w320Url ?? "",
       draftOnly,
-      cardDisplayDate: formatCardDateForDisplay(cardDate).trim(),
-      cardDisplayLocation: cardPlace.trim(),
+      cardDisplayDate:
+        formattedDate !== "" ? formattedDate : cardDate.trim() === "" ? "" : cardDate,
+      cardDisplayLocation: cardPlace.trim() === "" ? "" : cardPlace,
       cardTextShadowEnabled,
       cardSurfaceLayout,
       cardTitleEffect,

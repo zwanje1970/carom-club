@@ -3,6 +3,7 @@
 import { parse as parseOpenType } from "opentype.js/dist/opentype.mjs";
 import { logPlaceLayerDiagnosis } from "./preview-place-layer-diagnose";
 
+/** SVG path용 고정 폰트 — 시스템 UI 폰트와 무관, 캡처 시에만 네트워크 로드 */
 const OUTLINE_FONT_PUBLIC_URL = "/card-fonts/Pretendard-Regular.otf";
 
 type OpenTypeFont = {
@@ -39,6 +40,23 @@ type OutlineSnapshot = {
 
 let cachedFontPromise: Promise<OpenTypeFont | null> | null = null;
 
+async function loadOutlineFont(): Promise<OpenTypeFont | null> {
+  if (!cachedFontPromise) {
+    cachedFontPromise = (async () => {
+      try {
+        const response = await fetch(OUTLINE_FONT_PUBLIC_URL);
+        if (!response.ok) return null;
+        const buffer = await response.arrayBuffer();
+        const parsed = parseOpenType(buffer) as unknown as OpenTypeFont;
+        return parsed;
+      } catch {
+        return null;
+      }
+    })();
+  }
+  return cachedFontPromise;
+}
+
 const ENABLE_PATH_LAYER_CHECK_LOG = process.env.NODE_ENV !== "production";
 
 function logCardPathLayerCheck(message: string, payload?: Record<string, unknown>): void {
@@ -72,61 +90,45 @@ function toAnchor(textAlign: string): "start" | "middle" | "end" {
   return "start";
 }
 
-async function loadOutlineFont(): Promise<OpenTypeFont | null> {
-  if (!cachedFontPromise) {
-    cachedFontPromise = (async () => {
-      try {
-        const response = await fetch(OUTLINE_FONT_PUBLIC_URL);
-        if (!response.ok) return null;
-        const buffer = await response.arrayBuffer();
-        const parsed = parseOpenType(buffer) as unknown as OpenTypeFont;
-        return parsed;
-      } catch {
-        return null;
-      }
-    })();
-  }
-  return cachedFontPromise;
-}
-
 function extractOutlineSnapshots(cardRoot: HTMLElement): OutlineSnapshot[] {
   const cardRect = cardRoot.getBoundingClientRect();
   const nodes = Array.from(cardRoot.querySelectorAll<HTMLElement>('[data-outline-content-item="1"]'));
   const mapped = nodes.map<OutlineSnapshot | null>((node) => {
-      const text = (node.innerText || node.textContent || "").trim();
-      if (!text) return null;
-      const rect = node.getBoundingClientRect();
-      const style = window.getComputedStyle(node);
-      const fontSize = Number.parseFloat(style.fontSize.replace("px", "").trim());
-      const safeFontSize = Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 14;
-      const lineHeight = parseLineHeightPx(style.lineHeight, safeFontSize);
-      const anchor = toAnchor(style.textAlign);
-      const x =
-        anchor === "end"
-          ? rect.right - cardRect.left
-          : anchor === "middle"
-            ? rect.left - cardRect.left + rect.width / 2
-            : rect.left - cardRect.left;
-      const y = rect.top - cardRect.top;
-      const titleOutlineEnabled = node.dataset.titleOutlineEnabled === "1";
-      const titleOutlineColor = node.dataset.titleOutlineColor === "white" ? "#ffffff" : "#000000";
-      return {
-        text,
-        x,
-        y,
-        fontFamily: style.fontFamily,
-        fontSize: safeFontSize,
-        fontWeight: style.fontWeight,
-        fontStyle: style.fontStyle,
-        letterSpacing: style.letterSpacing,
-        lineHeight,
-        fill: style.color,
-        textAnchor: anchor,
-        stroke: titleOutlineEnabled ? titleOutlineColor : "none",
-        strokeWidth: titleOutlineEnabled ? 1.2 : 0,
-        paintOrder: titleOutlineEnabled ? ("stroke fill" as const) : undefined,
-      } satisfies OutlineSnapshot;
-    });
+    const raw = (typeof node.innerText === "string" ? node.innerText : node.textContent) ?? "";
+    if (raw.trim() === "") return null;
+    const text = raw;
+    const rect = node.getBoundingClientRect();
+    const style = window.getComputedStyle(node);
+    const fontSize = Number.parseFloat(style.fontSize.replace("px", "").trim());
+    const safeFontSize = Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 14;
+    const lineHeight = parseLineHeightPx(style.lineHeight, safeFontSize);
+    const anchor = toAnchor(style.textAlign);
+    const x =
+      anchor === "end"
+        ? rect.right - cardRect.left
+        : anchor === "middle"
+          ? rect.left - cardRect.left + rect.width / 2
+          : rect.left - cardRect.left;
+    const y = rect.top - cardRect.top;
+    const titleOutlineEnabled = node.dataset.titleOutlineEnabled === "1";
+    const titleOutlineColor = node.dataset.titleOutlineColor === "white" ? "#ffffff" : "#000000";
+    return {
+      text,
+      x,
+      y,
+      fontFamily: style.fontFamily,
+      fontSize: safeFontSize,
+      fontWeight: style.fontWeight,
+      fontStyle: style.fontStyle,
+      letterSpacing: style.letterSpacing,
+      lineHeight,
+      fill: style.color,
+      textAnchor: anchor,
+      stroke: titleOutlineEnabled ? titleOutlineColor : "none",
+      strokeWidth: titleOutlineEnabled ? 1.2 : 0,
+      paintOrder: titleOutlineEnabled ? ("stroke fill" as const) : undefined,
+    } satisfies OutlineSnapshot;
+  });
   return mapped.filter((v): v is OutlineSnapshot => v !== null);
 }
 
@@ -291,4 +293,3 @@ export async function withCardPreviewTextPathLayer(args: {
     });
   }
 }
-

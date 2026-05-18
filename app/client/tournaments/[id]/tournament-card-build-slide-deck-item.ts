@@ -41,14 +41,16 @@ export function buildSlideDeckItemForTournamentCapture(args: {
   tournamentFallbackLocation: string;
 }): SlideDeckItem {
   const { tournamentId, source, statusBadge, tournamentFallbackDate, tournamentFallbackLocation } = args;
+  const subtitleRaw = source.subtitle ?? "";
   const subtitle =
-    (source.subtitle ?? "").trim() ||
-    buildTournamentPublishedCardSubtitle({
-      cardDisplayDate: source.tournamentCardDisplayDate ?? "",
-      cardDisplayLocation: source.tournamentCardDisplayLocation ?? "",
-      tournamentDate: tournamentFallbackDate,
-      tournamentLocation: tournamentFallbackLocation,
-    });
+    subtitleRaw.trim() === ""
+      ? buildTournamentPublishedCardSubtitle({
+          cardDisplayDate: source.tournamentCardDisplayDate ?? "",
+          cardDisplayLocation: source.tournamentCardDisplayLocation ?? "",
+          tournamentDate: tournamentFallbackDate,
+          tournamentLocation: tournamentFallbackLocation,
+        })
+      : subtitleRaw;
 
   return {
     type: "tournament",
