@@ -825,6 +825,31 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   itemsRef.current = items;
   const renderItemsRef = useRef(renderItems);
   renderItemsRef.current = renderItems;
+  const v2CardOrderLoggedRef = useRef(false);
+
+  useEffect(() => {
+    if (!useV2) return;
+    if (v2CardOrderLoggedRef.current) return;
+    v2CardOrderLoggedRef.current = true;
+    const staticItems = renderItems.slice(0, 10);
+    const lcpHeroIndex = staticItems.findIndex((x) => Boolean(x.imageUrl?.trim()));
+    const eagerIndexes = new Set<number>();
+    for (let i = 0; i < staticItems.length; i++) {
+      if (!Boolean(staticItems[i]?.imageUrl?.trim())) continue;
+      eagerIndexes.add(i);
+      if (eagerIndexes.size >= MAIN_SLIDE_ENGINE_V2_STATIC_EAGER_IMAGE_COUNT) break;
+    }
+    staticItems.forEach((item, idx) => {
+      const imageUrl = item.imageUrl?.trim() ?? "";
+      const eager = eagerIndexes.has(idx);
+      const lcpHeroImage = idx === lcpHeroIndex && lcpHeroIndex >= 0;
+      const loading = eager || lcpHeroImage ? "eager" : "lazy";
+      const fetchPriority = lcpHeroImage ? "high" : eager ? "auto" : "none";
+      console.info(
+        `[v2-card-order] uiIndex=${idx + 1} cardId=${item.id} eager=${eager} loading=${loading} fetchPriority=${fetchPriority} imageUrl=${imageUrl}`,
+      );
+    });
+  }, [useV2, renderItems]);
 
   useLayoutEffect(() => {
     logMainCardReturn("component-mounted");
