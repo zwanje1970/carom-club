@@ -16,6 +16,7 @@ export function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScr
       const published640 = (item.publishedCardImageUrl ?? "").trim();
       const published320 = (item.publishedCardImage320Url ?? "").trim();
       const published480 = (item.publishedCardImage480Url ?? "").trim();
+      const publishedDirect = (item.publishedCardImageDirectUrl ?? "").trim();
       const publishedScrollBg = published480 || published640 || published320;
       if (publishedScrollBg) {
         return {
@@ -23,6 +24,7 @@ export function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScr
           href,
           title: item.title,
           imageUrl: publishedScrollBg,
+          ...(publishedDirect ? { directImageUrl: publishedDirect } : {}),
           faceCssBackground: null,
           external,
           slideDeckPngFace: true,
@@ -50,6 +52,7 @@ export function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScr
     const published640 = (item.publishedCardImageUrl ?? "").trim();
     const published320 = (item.publishedCardImage320Url ?? "").trim();
     const published480 = (item.publishedCardImage480Url ?? "").trim();
+    const publishedDirect = (item.publishedCardImageDirectUrl ?? "").trim();
     const scrollImg = published480 || published640 || published320;
 
     return {
@@ -57,6 +60,7 @@ export function slideDeckItemsToScrollCards(items: SlideDeckItem[]): MainSiteScr
       href,
       title: item.title,
       imageUrl: scrollImg || null,
+      ...(publishedDirect ? { directImageUrl: publishedDirect } : {}),
       faceCssBackground: scrollImg ? null : "#0f172a",
       external,
       slideDeckPngFace: Boolean(scrollImg),

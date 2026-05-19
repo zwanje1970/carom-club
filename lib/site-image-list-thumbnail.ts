@@ -2,6 +2,7 @@ import { extractProofImageIdFromSiteImageUrl } from "./site-proof-image-id";
 
 /** `loadProofImageAssetsList()` 행에서 목록 썸네일 판별에 필요한 필드만 */
 export type SiteListThumbnailProofFields = {
+  sitePublic?: boolean;
   storageW160Url?: string;
   storageW320Url?: string;
   storageW480Url?: string;
@@ -87,4 +88,44 @@ export function resolveSiteProofImageUrlWithVariantPreference(
     if (u) return u;
   }
   return buildPublicImageUrl(id, "w160");
+}
+
+/**
+ * 공개 메인(v2 실험)용 direct URL 후보.
+ * sitePublic이 확인된 이미지에서만 Firebase Storage URL을 반환한다.
+ */
+export function resolveSiteProofImageStorageUrlWithVariantPreference(
+  url: string | null | undefined,
+  assetsById: ReadonlyMap<string, SiteListThumbnailProofFields>,
+  preference: readonly SiteProofImageVariantPref[],
+): string | null {
+  if (typeof url !== "string") return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  const idRaw = extractProofImageIdFromSiteImageUrl(trimmed);
+  if (!idRaw) return null;
+  const id = idRaw.trim();
+  const asset = assetsById.get(id) ?? assetsById.get(id.toLowerCase());
+  if (!asset || asset.sitePublic !== true) return null;
+
+  const pick = (v: SiteProofImageVariantPref): string | null => {
+    const s =
+      v === "w160"
+        ? asset.storageW160Url
+        : v === "w320"
+          ? asset.storageW320Url
+          : v === "w480"
+            ? asset.storageW480Url
+            : v === "w640"
+              ? asset.storageW640Url
+              : asset.storageOriginalUrl;
+    const t = typeof s === "string" ? s.trim() : "";
+    return t.startsWith("https://") ? t : null;
+  };
+
+  for (const v of preference) {
+    const u = pick(v);
+    if (u) return u;
+  }
+  return null;
 }

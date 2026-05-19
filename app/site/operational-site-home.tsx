@@ -51,6 +51,8 @@ function snapshotToTournamentSlideDeckItem(snapshot: PublishedCardSnapshot): Sli
   const pub480 =
     typeof snapshot.publishedCardImage480Url === "string" ? snapshot.publishedCardImage480Url.trim() : "";
   const pub640 = typeof snapshot.publishedCardImageUrl === "string" ? snapshot.publishedCardImageUrl.trim() : "";
+  const pubDirect =
+    typeof snapshot.publishedCardImageDirectUrl === "string" ? snapshot.publishedCardImageDirectUrl.trim() : "";
   return {
     type: "tournament",
     linkType: "internal",
@@ -61,6 +63,7 @@ function snapshotToTournamentSlideDeckItem(snapshot: PublishedCardSnapshot): Sli
     ...(pub640 ? { publishedCardImageUrl: pub640 } : {}),
     ...(pub320 ? { publishedCardImage320Url: pub320 } : {}),
     ...(pub480 ? { publishedCardImage480Url: pub480 } : {}),
+    ...(pubDirect ? { publishedCardImageDirectUrl: pubDirect } : {}),
   };
 }
 

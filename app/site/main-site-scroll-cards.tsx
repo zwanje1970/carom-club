@@ -384,6 +384,8 @@ export type MainSiteScrollCardItem = {
   href: string;
   title: string;
   imageUrl: string | null;
+  /** v2 실험용 Firebase direct URL(없으면 기존 imageUrl 사용) */
+  directImageUrl?: string | null;
   /** 이미지 없을 때 카드 면 배경(CSS `background` 값) */
   faceCssBackground: string | null;
   external: boolean;
@@ -408,6 +410,7 @@ type CardRowProps = {
   prioritizeNearViewportImage?: boolean;
   onLcpHeroImageLoad?: () => void;
   onLcpHeroImageError?: () => void;
+  useDirectImageUrl?: boolean;
 };
 
 function cardSlotClassNames(base: string, selected: boolean, selectedMod?: string): string {
@@ -444,6 +447,7 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   prioritizeNearViewportImage = false,
   onLcpHeroImageLoad,
   onLcpHeroImageError,
+  useDirectImageUrl = false,
 }: CardRowProps) {
   const onPointerDown = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
@@ -455,7 +459,15 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
     [item.id, onCardPointerDown],
   );
 
-  const deckImgUrl = item.imageUrl?.trim() ?? "";
+  const fallbackDeckImgUrl = item.imageUrl?.trim() ?? "";
+  const directDeckImgUrl = item.directImageUrl?.trim() ?? "";
+  const [failedDirectUrl, setFailedDirectUrl] = useState<string | null>(null);
+  const canUseDirectUrl =
+    useDirectImageUrl && directDeckImgUrl.length > 0 && failedDirectUrl !== directDeckImgUrl;
+  const deckImgUrl = canUseDirectUrl ? directDeckImgUrl : fallbackDeckImgUrl;
+  useEffect(() => {
+    setFailedDirectUrl(null);
+  }, [directDeckImgUrl, fallbackDeckImgUrl, useDirectImageUrl]);
   /** PNG 면: URL 있으면 placeholder 플래그와 무관하게 실제 이미지 카드 */
   const renderAsPngDeck = Boolean(deckImgUrl);
   const { imgRef, onImageLoad } = useMainScrollDeckImageRef(deckImgUrl);
@@ -545,6 +557,9 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                             if (lcpHeroImage) onLcpHeroImageLoad?.();
                           }}
                           onError={() => {
+                            if (canUseDirectUrl && fallbackDeckImgUrl) {
+                              setFailedDirectUrl(directDeckImgUrl);
+                            }
                             if (lcpHeroImage) onLcpHeroImageError?.();
                           }}
                         />
@@ -651,6 +666,7 @@ function renderMainSlideEngineV1(args: MainSiteScrollCardsRenderCoreArgs): React
               prioritizeNearViewportImage={prioritizeNearViewportImage}
               onLcpHeroImageLoad={lcpHeroImage ? args.onLcpHeroImageLoad : undefined}
               onLcpHeroImageError={lcpHeroImage ? args.onLcpHeroImageError : undefined}
+              useDirectImageUrl={false}
             />
           </div>
         );
@@ -748,6 +764,7 @@ function renderMainSlideEngineV2OrFallback(args: MainSiteScrollCardsRenderCoreAr
                     prioritizeNearViewportImage={prioritizeNearViewportImage}
                     onLcpHeroImageLoad={lcpHeroImage ? args.onLcpHeroImageLoad : undefined}
                     onLcpHeroImageError={lcpHeroImage ? args.onLcpHeroImageError : undefined}
+                    useDirectImageUrl={true}
                   />
                 </div>
               );

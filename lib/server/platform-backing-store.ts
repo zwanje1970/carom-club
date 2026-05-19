@@ -51,6 +51,7 @@ import {
   SITE_MAIN_SLIDE_CARD_IMAGE_VARIANT_PREF,
   SITE_PUBLIC_DETAIL_IMAGE_VARIANT_PREF,
   resolveSiteListThumbnailFromPosterWithAssetMap,
+  resolveSiteProofImageStorageUrlWithVariantPreference,
   resolveSiteProofImageUrlWithVariantPreference,
   type SiteListThumbnailProofFields,
 } from "../site-image-list-thumbnail";
@@ -966,6 +967,8 @@ export type PublishedCardSnapshot = {
   publishedCardImageUrl?: string | null;
   publishedCardImage320Url?: string | null;
   publishedCardImage480Url?: string | null;
+  /** v2 실험용: 공개 검증(sitePublic)된 Firebase direct URL 후보(없으면 미포함) */
+  publishedCardImageDirectUrl?: string | null;
   /** 메인: 배경 PNG + HTML 글자 모드. false면 완성 PNG로 간주해 HTML 오버레이 없음. */
   publishedCardImageBackgroundOnly?: boolean;
   /** 메인: 게시 시점 오버레이 좌표·타이포 스냅샷(있으면 템플릿 분기 없이 표시) */
@@ -11031,6 +11034,11 @@ function sanitizePublishedCardSnapshotForMainSiteSlide(
     buildSitePublicImageUrl,
     SITE_PUBLIC_DETAIL_IMAGE_VARIANT_PREF,
   );
+  const imgDirect = resolveSiteProofImageStorageUrlWithVariantPreference(
+    source,
+    byId,
+    SITE_MAIN_SLIDE_CARD_IMAGE_VARIANT_PREF,
+  );
 
   if (imgMain === null) {
     const next: PublishedCardSnapshot = {
@@ -11054,6 +11062,7 @@ function sanitizePublishedCardSnapshotForMainSiteSlide(
     ...s,
     image320Url: imgMain,
     image640Url: img640 ?? imgMain,
+    ...(imgDirect ? { publishedCardImageDirectUrl: imgDirect } : {}),
   };
   if (next.publishedCardImage480Url && extractProofImageIdFromSiteImageUrl(next.publishedCardImage480Url)) {
     next.publishedCardImage480Url = imgMain;

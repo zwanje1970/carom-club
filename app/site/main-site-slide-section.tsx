@@ -71,6 +71,9 @@ function mergeInitialSlideDeckPreferringRicherVisual(
           ...(prev.publishedCardImageUrl?.trim() ? { publishedCardImageUrl: prev.publishedCardImageUrl } : {}),
           ...(prev.publishedCardImage320Url?.trim() ? { publishedCardImage320Url: prev.publishedCardImage320Url } : {}),
           ...(prev.publishedCardImage480Url?.trim() ? { publishedCardImage480Url: prev.publishedCardImage480Url } : {}),
+          ...(prev.publishedCardImageDirectUrl?.trim()
+            ? { publishedCardImageDirectUrl: prev.publishedCardImageDirectUrl }
+            : {}),
         });
         continue;
       }
