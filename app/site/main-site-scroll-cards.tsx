@@ -392,10 +392,59 @@ function applyV2MainScrollTrackTransform(track: HTMLElement | null, virtualOffse
   applyMainScrollTrackTransformDiag(track, transformCss.appliedTransformOffset);
 }
 
-function measureV2MainScrollLoopDistancePx(track: HTMLElement | null): number {
-  if (!track) return 0;
+/** track `translate3d(0, -offset, 0)` → virtualOffset(px) */
+function readV2AppliedTransformOffsetPx(track: HTMLElement | null): number {
+  if (!track || typeof getComputedStyle === "undefined") return 0;
+  const transform = getComputedStyle(track).transform;
+  if (!transform || transform === "none") return 0;
+  const matrix2d = transform.match(/^matrix\(([^)]+)\)$/);
+  if (matrix2d) {
+    const parts = matrix2d[1]!.split(",").map((s) => Number.parseFloat(s.trim()));
+    if (parts.length >= 6 && Number.isFinite(parts[5])) {
+      return Math.max(0, -parts[5]!);
+    }
+  }
+  const matrix3d = transform.match(/^matrix3d\(([^)]+)\)$/);
+  if (matrix3d) {
+    const parts = matrix3d[1]!.split(",").map((s) => Number.parseFloat(s.trim()));
+    if (parts.length >= 16 && Number.isFinite(parts[13])) {
+      return Math.max(0, -parts[13]!);
+    }
+  }
+  return 0;
+}
+
+function normalizeV2VirtualOffsetPx(offsetPx: number, loopDistancePx: number): number {
+  if (!Number.isFinite(offsetPx) || offsetPx <= 0) return 0;
+  if (loopDistancePx <= 0) return offsetPx;
+  return ((offsetPx % loopDistancePx) + loopDistancePx) % loopDistancePx;
+}
+
+/**
+ * transform + scrollTop 합을 virtualOffset으로 맞춘 뒤 scrollTop 0·transform만 유지.
+ * @returns 위치를 갱신했으면 true
+ */
+function syncV2VirtualOffsetFromManualView(args: {
+  viewport: HTMLElement;
+  track: HTMLElement;
+  segmentRoot: HTMLElement | null;
+  virtualOffsetRef: { current: number };
+}): boolean {
+  const loopDistance = measureV2MainScrollLoopDistancePx(args.segmentRoot);
+  const combined = readV2AppliedTransformOffsetPx(args.track) + args.viewport.scrollTop;
+  const nextOffset = normalizeV2VirtualOffsetPx(combined, loopDistance);
+  if (!Number.isFinite(nextOffset)) return false;
+  args.virtualOffsetRef.current = nextOffset;
+  args.viewport.scrollTop = 0;
+  applyV2MainScrollTrackTransform(args.track, nextOffset);
+  return true;
+}
+
+/** v2 segment는 `display: contents` — 카드 슬롯은 track 직계가 아니라 segment 자식 */
+function measureV2MainScrollLoopDistancePx(segmentRoot: HTMLElement | null): number {
+  if (!segmentRoot) return 0;
   let total = 0;
-  for (const child of track.children) {
+  for (const child of segmentRoot.children) {
     if (!(child instanceof HTMLElement)) continue;
     if (!child.classList.contains(siteStyles.marqueeCardSlotShell)) continue;
     const h = child.offsetHeight;
@@ -406,16 +455,16 @@ function measureV2MainScrollLoopDistancePx(track: HTMLElement | null): number {
 
 function resolveV2LeadItemIdAtVirtualOffset(
   items: MainSiteScrollCardItem[],
-  track: HTMLElement | null,
+  segmentRoot: HTMLElement | null,
   virtualOffsetPx: number,
 ): string {
   if (items.length === 0) return "";
-  const loopDistance = measureV2MainScrollLoopDistancePx(track);
+  const loopDistance = measureV2MainScrollLoopDistancePx(segmentRoot);
   if (loopDistance <= 0) return items[0]!.id;
   let remain = ((virtualOffsetPx % loopDistance) + loopDistance) % loopDistance;
-  if (!track) return items[0]!.id;
+  if (!segmentRoot) return items[0]!.id;
   let itemIndex = 0;
-  for (const child of track.children) {
+  for (const child of segmentRoot.children) {
     if (!(child instanceof HTMLElement)) continue;
     if (!child.classList.contains(siteStyles.marqueeCardSlotShell)) continue;
     const item = items[itemIndex];
@@ -881,6 +930,9 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const v2PendingRestoreVirtualOffsetRef = useRef<number | null>(null);
   const v2VirtualOffsetRef = useRef(0);
   const v2TransformLoopLoggedRef = useRef(false);
+  const v2AutoTransformMeasureLoggedRef = useRef(false);
+  const v2AutoTransformSkipLoggedRef = useRef(false);
+  const v2AutoTransformApplyLoggedRef = useRef(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [autoSlideReady, setAutoSlideReady] = useState(false);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -1327,7 +1379,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       const virtualOffsetPx = Math.max(0, v2VirtualOffsetRef.current);
       const leadItemId = resolveV2LeadItemIdAtVirtualOffset(
         v2DisplayItemsRef.current,
-        track,
+        primarySegmentRef.current,
         virtualOffsetPx,
       );
       if (!leadItemId) return;
@@ -1354,19 +1406,46 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       }, 220);
     };
 
-    const startAutoSlide = () => {
+    const bakeV2VirtualOffsetFromCurrentView = (): void => {
+      const track = trackRef.current;
+      const segment = primarySegmentRef.current;
+      if (!track) return;
+      const loopDistance = measureV2MainScrollLoopDistancePx(segment);
+      const combined = readV2AppliedTransformOffsetPx(track) + viewport.scrollTop;
+      v2VirtualOffsetRef.current = normalizeV2VirtualOffsetPx(combined, loopDistance);
+    };
+
+    const startAutoSlide = (resumeFromManual = false) => {
       if (selectedItemId !== null || pausedByUser) return;
       if (v2AutoSlideRafRef.current !== null) return;
       const track = trackRef.current;
-      viewport.scrollTop = 0;
+      if (!track) return;
+      const segment = primarySegmentRef.current;
       const pending = v2PendingRestoreVirtualOffsetRef.current;
       if (pending != null) {
         v2VirtualOffsetRef.current = Math.max(0, pending);
         v2PendingRestoreVirtualOffsetRef.current = null;
+        viewport.scrollTop = 0;
+        applyV2MainScrollTrackTransform(track, v2VirtualOffsetRef.current);
         programmaticScrollUntilMsRef.current = performance.now() + 180;
         logMainCardReturn("v2-session-restore-applied");
-      }
-      if (track) {
+      } else if (
+        syncV2VirtualOffsetFromManualView({
+          viewport,
+          track,
+          segmentRoot: segment,
+          virtualOffsetRef: v2VirtualOffsetRef,
+        })
+      ) {
+        programmaticScrollUntilMsRef.current = performance.now() + 180;
+        if (resumeFromManual) {
+          logMainCardReturn("v2-manual-sync");
+          logMainCardReturn("v2-auto-resume-from-manual");
+          persistV2Session();
+          logMainCardReturn("v2-session-save-after-manual");
+        }
+      } else {
+        viewport.scrollTop = 0;
         applyV2MainScrollTrackTransform(track, v2VirtualOffsetRef.current);
       }
       logMainCardReturn("v2-auto-transform-start");
@@ -1379,10 +1458,11 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       }
       pausedByUser = true;
       stopAutoSlide();
+      bakeV2VirtualOffsetFromCurrentView();
       if (selectedItemId !== null) return;
       v2AutoSlideResumeTimerRef.current = window.setTimeout(() => {
         pausedByUser = false;
-        startAutoSlide();
+        startAutoSlide(true);
       }, restartAfterUserInputMs);
     };
 
@@ -1392,6 +1472,11 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
 
     const onScroll = () => {
       if (performance.now() <= programmaticScrollUntilMsRef.current) return;
+      bakeV2VirtualOffsetFromCurrentView();
+      if (selectedItemId !== null) {
+        schedulePersistV2Session();
+        return;
+      }
       scheduleResume();
       schedulePersistV2Session();
     };
@@ -1407,10 +1492,19 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         stopAutoSlide();
         return;
       }
-      const loopDistance = measureV2MainScrollLoopDistancePx(track);
+      const segment = primarySegmentRef.current;
+      const loopDistance = measureV2MainScrollLoopDistancePx(segment);
       if (loopDistance <= 0) {
+        if (!v2AutoTransformSkipLoggedRef.current) {
+          v2AutoTransformSkipLoggedRef.current = true;
+          logMainCardReturn("v2-auto-transform-skip");
+        }
         v2AutoSlideRafRef.current = requestAnimationFrame(step);
         return;
+      }
+      if (!v2AutoTransformMeasureLoggedRef.current) {
+        v2AutoTransformMeasureLoggedRef.current = true;
+        logMainCardReturn("v2-auto-transform-measure");
       }
       const prevTime = v2AutoSlideLastFrameRef.current ?? frameTime;
       const dtSec = Math.max(0, (frameTime - prevTime) / 1000);
@@ -1435,6 +1529,10 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       programmaticScrollUntilMsRef.current = performance.now() + 120;
       node.scrollTop = 0;
       applyV2MainScrollTrackTransform(track, nextOffset);
+      if (!v2AutoTransformApplyLoggedRef.current) {
+        v2AutoTransformApplyLoggedRef.current = true;
+        logMainCardReturn("v2-auto-transform-apply");
+      }
       v2AutoSlideRafRef.current = requestAnimationFrame(step);
     };
 
@@ -1462,12 +1560,35 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         window.clearTimeout(saveTimer);
         saveTimer = null;
       }
+      bakeV2VirtualOffsetFromCurrentView();
       persistV2Session();
       clearMainScrollTrackTransformDiag(trackRef.current);
       logMainCardReturn("v2-auto-slide-stop");
       stopAutoSlide();
     };
   }, [autoSlideReady, selectedItemId, slideCardMoveSpeedLevel, useV2, v2BaseItemsIdsKey]);
+
+  useLayoutEffect(() => {
+    if (!useV2) return;
+    if (selectedItemId !== null) return;
+    if (!autoSlideReady) return;
+    if (v2PendingRestoreVirtualOffsetRef.current != null) return;
+    const viewport = viewportRef.current;
+    const track = trackRef.current;
+    if (!viewport || !track) return;
+    if (v2AutoSlideRafRef.current !== null) return;
+    if (
+      syncV2VirtualOffsetFromManualView({
+        viewport,
+        track,
+        segmentRoot: primarySegmentRef.current,
+        virtualOffsetRef: v2VirtualOffsetRef,
+      })
+    ) {
+      programmaticScrollUntilMsRef.current = performance.now() + 180;
+      logMainCardReturn("v2-manual-sync");
+    }
+  }, [useV2, selectedItemId, autoSlideReady, v2BaseItemsIdsKey]);
 
   /** 탭 이동·복귀 시에도 스크롤 위치가 반영되도록 언마운트만이 아닌 스크롤 중 저장 */
   useEffect(() => {
