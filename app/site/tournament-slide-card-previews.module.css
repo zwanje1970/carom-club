@@ -1045,7 +1045,7 @@ article[data-editor-card-preview="1"] .frameLead {
   -webkit-line-clamp: 1;
   overflow: hidden;
   word-break: break-word;
-  white-space: normal;
+  white-space: pre-wrap;
 }
 
 article[data-editor-card-preview="1"] .classicDesc,
