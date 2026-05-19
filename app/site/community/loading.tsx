@@ -1,12 +1,4 @@
-import SiteHubRouteLoadingShell from "../components/SiteHubRouteLoadingShell";
-
-/** 커뮤니티 목록·상세 등 전환 시 RSC 대기 구간 */
+/** 커뮤니티 전환 — 껍데기는 RSC가 바로 내려주고, 목록만 클라이언트에서 로드 */
 export default function SiteCommunitySegmentLoading() {
-  return (
-    <SiteHubRouteLoadingShell
-      brandTitle="커뮤니티"
-      auxiliaryBarClassName="site-shell-controls--site-list"
-      sectionClassName="site-site-gray-main v3-stack ui-community-page"
-    />
-  );
+  return null;
 }

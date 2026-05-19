@@ -8,6 +8,7 @@ import {
   isPrimaryTabKey,
 } from "./community-tab-config";
 import CommunityPostDetailRowLink from "./CommunityPostDetailRowLink";
+import CommunityLoadDiagListMarkers from "./CommunityLoadDiagListMarkers";
 import SiteListImage160 from "../components/SiteListImage160";
 
 function formatListDateTime(iso: string): string {
@@ -53,6 +54,8 @@ export default function CommunityBoardPostList({
   const emptyDescLine = emptyDesc ?? "첫 글을 작성해보세요.";
 
   return (
+    <>
+    <CommunityLoadDiagListMarkers itemCount={items.length} />
     <ul className="ui-community-board-rows">
       {items.length === 0 ? (
         <li className="ui-community-board-row ui-community-board-row--empty" role="status">
@@ -108,5 +111,6 @@ export default function CommunityBoardPostList({
         })
       )}
     </ul>
+    </>
   );
 }
