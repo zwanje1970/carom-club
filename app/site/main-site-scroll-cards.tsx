@@ -96,6 +96,16 @@ function logMainCardReturn(
   console.info(parts.join(" "));
 }
 
+/** kick 시 src 재할당·decode 생략 — 이미 로드·decode 캐시된 카드 이미지 */
+function isMainScrollDeckImageKickSatisfied(img: HTMLImageElement, src: string): boolean {
+  if (!src || !(img.currentSrc || img.src || "").trim()) return false;
+  const browserLoaded = img.complete && img.naturalWidth > 0;
+  const decodeCached = isMainScrollDeckImageDecodeDone(src);
+  if (browserLoaded) return true;
+  if (decodeCached && img.naturalWidth > 0) return true;
+  return false;
+}
+
 /** 홈 복귀·스크롤 복원 후 lazy img가 뷰포트에 남는 WebView 표시 누락 보정 — 뷰포트 내 img만 */
 function kickVisibleMainScrollDeckImages(viewport: HTMLElement): MainCardReturnKickStats {
   const vRect = viewport.getBoundingClientRect();
@@ -110,6 +120,9 @@ function kickVisibleMainScrollDeckImages(viewport: HTMLElement): MainCardReturnK
     if (!src) continue;
     foundImages += 1;
     img.dataset.forceVisible = "1";
+    if (isMainScrollDeckImageKickSatisfied(img, src)) {
+      continue;
+    }
     const needsReload = !img.complete || img.naturalWidth <= 0;
     if (needsReload) {
       reloadedImages += 1;
@@ -150,6 +163,9 @@ const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
 
 /** segment a+b 합산 DOM 상한 — WebView 메모리·이미지 부담 완화 */
 export const MAX_RENDERED_SCROLL_ITEMS = 48;
+
+/** segment a·b 각각 — 이미지 있는 앞 N장만 loading=eager (나머지 lazy) */
+const INITIAL_EAGER_IMAGE_COUNT_PER_SEGMENT = 6;
 
 function logMainScrollRenderCountLimit(payload: {
   sourceCount: number;
@@ -227,7 +243,7 @@ type CardRowProps = {
   onShortcutActivate?: () => void;
   /** 문서 순서상 첫 번째 면 이미지(LCP 후보) — 링크 preload 없이 img 우선순위만 부여 */
   lcpHeroImage?: boolean;
-  /** 초기 뷰포트 근처 카드: lazy 완화 */
+  /** 초기 뷰포트 근처 카드(이미지 있는 앞 N장): loading eager — LCP high는 lcpHeroImage만 */
   prioritizeNearViewportImage?: boolean;
   onLcpHeroImageLoad?: () => void;
   onLcpHeroImageError?: () => void;
@@ -468,7 +484,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     for (let i = 0; i < renderItems.length; i++) {
       if (!Boolean(renderItems[i]?.imageUrl?.trim())) continue;
       out.push(i);
-      if (out.length >= 3) break;
+      if (out.length >= INITIAL_EAGER_IMAGE_COUNT_PER_SEGMENT) break;
     }
     return out;
   }, [renderItems]);
@@ -1148,8 +1164,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         const rowKey = `${segmentKey}-${item.id}`;
         const lcpHeroImage =
           segmentKey === "a" && itemIndex === lcpHeroItemIndex && lcpHeroItemIndex >= 0;
-        const prioritizeNearViewportImage =
-          segmentKey === "a" && initialPriorityIndexes.includes(itemIndex);
+        const prioritizeNearViewportImage = initialPriorityIndexes.includes(itemIndex);
         return (
           <div
             key={rowKey}
