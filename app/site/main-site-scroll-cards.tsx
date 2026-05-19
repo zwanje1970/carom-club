@@ -481,6 +481,10 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   renderItemsRef.current = renderItems;
 
   useEffect(() => {
+    logMainCardReturn("component-mounted");
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const onPageShow = (_ev: PageTransitionEvent) => {
       logMainCardReturn("pageshow");
