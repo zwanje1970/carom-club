@@ -480,8 +480,28 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const renderItemsRef = useRef(renderItems);
   renderItemsRef.current = renderItems;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     logMainCardReturn("component-mounted");
+    if (typeof window === "undefined") return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    logMainCardReturn("component-mounted-kick-scheduled");
+    kickVisibleMainScrollDeckImages(viewport);
+
+    let delayedKickTimer: number | undefined;
+    const rafId = requestAnimationFrame(() => {
+      kickVisibleMainScrollDeckImages(viewport);
+      delayedKickTimer = window.setTimeout(() => {
+        const stats = kickVisibleMainScrollDeckImages(viewport);
+        logMainCardReturn("component-mounted-kick-done", stats);
+      }, 150);
+    });
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (delayedKickTimer != null) window.clearTimeout(delayedKickTimer);
+    };
   }, []);
 
   useEffect(() => {
