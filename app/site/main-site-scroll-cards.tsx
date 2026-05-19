@@ -166,6 +166,8 @@ export const MAX_RENDERED_SCROLL_ITEMS = 48;
 
 /** segment a만 — 이미지 있는 앞 N장 loading=eager (segment b는 전부 lazy, 비교 실험) */
 const INITIAL_EAGER_IMAGE_COUNT_PER_SEGMENT = 6;
+/** v2 정지 렌더 실험: 첫 화면 하단 카드 요청 보강용 eager 범위 */
+const MAIN_SLIDE_ENGINE_V2_STATIC_EAGER_IMAGE_COUNT = 8;
 
 /**
  * v2 준비(미연결): 실험 플래그 이름만 고정.
@@ -704,7 +706,7 @@ function renderMainSlideEngineV2OrFallback(args: MainSiteScrollCardsRenderCoreAr
   for (let i = 0; i < staticItems.length; i++) {
     if (!Boolean(staticItems[i]?.imageUrl?.trim())) continue;
     eagerIndexes.add(i);
-    if (eagerIndexes.size >= INITIAL_EAGER_IMAGE_COUNT_PER_SEGMENT) break;
+    if (eagerIndexes.size >= MAIN_SLIDE_ENGINE_V2_STATIC_EAGER_IMAGE_COUNT) break;
   }
 
   return (
