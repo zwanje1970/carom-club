@@ -3,7 +3,7 @@
  */
 export function extractProofImageIdFromSiteImageUrl(url: string): string | null {
   const trimmed = url.trim();
-  const fromFile = trimmed.match(/\/site-images\/(?:original|w160|w320|w640)\/([^/?#]+)/);
+  const fromFile = trimmed.match(/\/site-images\/(?:original|w160|w320|w480|w640)\/([^/?#]+)/);
   if (fromFile?.[1]) return decodeURIComponent(fromFile[1]);
   const fromProof = trimmed.match(/\/api\/proof-images\/([^/?]+)/);
   if (fromProof?.[1]) return decodeURIComponent(fromProof[1]);

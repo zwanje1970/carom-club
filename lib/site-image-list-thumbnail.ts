@@ -41,8 +41,8 @@ export function resolveSiteListThumbnailFromPosterWithAssetMap(
   return buildPublicImageUrl(id, "w160");
 }
 
-/** 메인 슬라이드 게시카드(480 계열) */
-export const SITE_MAIN_SLIDE_CARD_IMAGE_VARIANT_PREF = ["w480", "w320", "w640", "w160", "original"] as const;
+/** 메인 슬라이드 게시카드(480 계열, original 제외) */
+export const SITE_MAIN_SLIDE_CARD_IMAGE_VARIANT_PREF = ["w480", "w320", "w640", "w160"] as const;
 /** 상세·본문(640 계열 우선) */
 export const SITE_PUBLIC_DETAIL_IMAGE_VARIANT_PREF = ["original", "w640", "w320", "w160"] as const;
 
@@ -87,7 +87,7 @@ export function resolveSiteProofImageUrlWithVariantPreference(
     const u = pick(v);
     if (u) return u;
   }
-  return buildPublicImageUrl(id, "w160");
+  return null;
 }
 
 /**
