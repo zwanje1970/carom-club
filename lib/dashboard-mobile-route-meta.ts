@@ -41,7 +41,7 @@ export function dashboardMobileChromeMeta(
     if (tbase && p === tbase) return { title: "대회관리", backHref: "/client/tournaments" };
     if (tbase && p.startsWith(`${tbase}/`)) {
       if (p.endsWith("/edit")) return { title: "대회 수정", backHref: tbase };
-      if (p.includes("/bracket/quick-results")) return { title: "간편입력", backHref: `${tbase}/bracket` };
+      if (p.includes("/bracket/quick-results")) return { title: "대회 진행", backHref: `${tbase}/bracket` };
       if (p.includes("/bracket/auto")) return { title: "자동 대진표", backHref: tbase };
       if (p.includes("/bracket/manual")) return { title: "수동 대진표", backHref: tbase };
       if (p.includes("/bracket/preview")) return { title: "대진표 미리보기", backHref: tbase };

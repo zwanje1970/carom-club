@@ -7,6 +7,12 @@ function decodeUrlKey(url: string): string {
   return url.trim();
 }
 
+/** 진단용 — 해당 URL이 이미 decode 완료 캐시에 있는지(동작 변경 없음) */
+export function isMainScrollDeckImageDecodeDone(url: string): boolean {
+  const key = decodeUrlKey(url);
+  return key !== "" && decodeDoneUrls.has(key);
+}
+
 /** kick 등에서 src를 다시 넣을 때 — 해당 URL decode 캐시만 제거(실패 시와 동일, 재시도 가능) */
 export function clearMainScrollDeckImageDecodeCacheForUrl(url: string): void {
   const key = decodeUrlKey(url);

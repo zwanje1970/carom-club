@@ -9,6 +9,7 @@ import {
   isEligibleBracketWinnerUserId,
   shuffleScopeForSlice,
   type BracketLike,
+  type BracketRoundLike,
 } from "./bracket-view-server-sync";
 import { bracketSlotDisplayName } from "../../../../../lib/bracket-player-slot";
 
@@ -198,7 +199,7 @@ export function applyLocalWinnerPick(bracket: BracketLike, matchId: string, winn
   return b;
 }
 
-function refreshRoundStatusFromMatches(round: {
+export function refreshRoundStatusFromMatches(round: {
   status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
   matches: Array<{ status: "PENDING" | "COMPLETED" }>;
 }): void {
@@ -208,6 +209,172 @@ function refreshRoundStatusFromMatches(round: {
   if (allCompleted) round.status = "COMPLETED";
   else if (allPending) round.status = "PENDING";
   else round.status = "IN_PROGRESS";
+}
+
+function emptyBracketSlot(): { userId: string; name: string; displayName?: string | null } {
+  return { userId: "", name: "" };
+}
+
+function newLocalBracketMatchId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `local-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function clearMatchResultInPlace(m: {
+  winnerUserId: string | null;
+  winnerName: string | null;
+  status: "PENDING" | "COMPLETED";
+  quickResultDetail?: unknown;
+}): void {
+  m.winnerUserId = null;
+  m.winnerName = null;
+  m.status = "PENDING";
+  delete (m as { quickResultDetail?: unknown }).quickResultDetail;
+}
+
+/** 승자를 다음 라운드 슬롯에 즉시 배치 (nextMatchIndex = floor(matchIndex / 2)). */
+export function applyLocalAdvanceRound(bracket: BracketLike, matchId: string): BracketLike | null {
+  const b = cloneBracket(bracket);
+  const loc = findBracketMatchLocation(b, matchId);
+  if (!loc) return null;
+  const { round, match, sliceRounds } = loc;
+  if (match.status !== "COMPLETED") return b;
+
+  const w = (match.winnerUserId ?? "").trim();
+  if (!isEligibleBracketWinnerUserId(w)) return b;
+
+  const matchIndex = round.matches.findIndex((m) => m.id === matchId);
+  if (matchIndex < 0) return b;
+
+  const winner =
+    match.player1.userId.trim() === w
+      ? match.player1
+      : match.player2.userId.trim() === w
+        ? match.player2
+        : null;
+  if (!winner) return null;
+
+  const winnerName =
+    (typeof match.winnerName === "string" && match.winnerName.trim() !== ""
+      ? match.winnerName.trim()
+      : slotLabel(winner)) || slotLabel(winner);
+
+  const nextRn = round.roundNumber + 1;
+  const nextMatchIndex = Math.floor(matchIndex / 2);
+  const slot: "player1" | "player2" = matchIndex % 2 === 0 ? "player1" : "player2";
+  const nextMatchCount = Math.max(1, Math.ceil(round.matches.length / 2));
+
+  let nextRound = sliceRounds.find((r) => r.roundNumber === nextRn);
+  if (!nextRound) {
+    const matches: BracketRoundLike["matches"] = [];
+    for (let i = 0; i < nextMatchCount; i++) {
+      matches.push({
+        id: newLocalBracketMatchId(),
+        player1: emptyBracketSlot(),
+        player2: emptyBracketSlot(),
+        winnerUserId: null,
+        winnerName: null,
+        status: "PENDING",
+      });
+    }
+    nextRound = { roundNumber: nextRn, matches, status: "PENDING" };
+    sliceRounds.push(nextRound);
+    sliceRounds.sort((a, b) => a.roundNumber - b.roundNumber);
+  }
+
+  while (nextRound.matches.length < nextMatchCount) {
+    nextRound.matches.push({
+      id: newLocalBracketMatchId(),
+      player1: emptyBracketSlot(),
+      player2: emptyBracketSlot(),
+      winnerUserId: null,
+      winnerName: null,
+      status: "PENDING",
+    });
+  }
+
+  const target = nextRound.matches[nextMatchIndex];
+  if (!target) return null;
+
+  target[slot] = {
+    userId: winner.userId,
+    name: winnerName,
+    ...("displayName" in winner && winner.displayName !== undefined
+      ? { displayName: (winner as { displayName?: string | null }).displayName ?? null }
+      : {}),
+  };
+  refreshRoundStatusFromMatches(nextRound);
+  return b;
+}
+
+/** 빠른 결과: 승자 저장 + 라운드 상태 + 다음 슬롯 배치(작업대 즉시 반영). */
+export function applyLocalQuickResultsWinnerPick(
+  bracket: BracketLike,
+  matchId: string,
+  winnerUserId: string,
+): BracketLike | null {
+  const picked = applyLocalWinnerPick(bracket, matchId, winnerUserId);
+  if (!picked) return null;
+  const loc = findBracketMatchLocation(picked, matchId);
+  if (loc) refreshRoundStatusFromMatches(loc.round);
+  return applyLocalAdvanceRound(picked, matchId);
+}
+
+function pruneSliceRoundsWithoutEligibleParticipants(sliceRounds: BracketRoundLike[], afterRoundNumber: number): void {
+  for (let i = sliceRounds.length - 1; i >= 0; i--) {
+    const r = sliceRounds[i]!;
+    if (r.roundNumber <= afterRoundNumber) continue;
+    const anyEligible = r.matches.some(
+      (m) =>
+        isEligibleBracketWinnerUserId(m.player1.userId) || isEligibleBracketWinnerUserId(m.player2.userId),
+    );
+    if (!anyEligible) {
+      sliceRounds.splice(i, 1);
+    }
+  }
+}
+
+/** 빠른 결과: 되돌리기 — 다음 슬롯 제거 + 이후 라운드 연쇄 제거(서버 대기 없음). */
+export function applyLocalQuickResultsClearWinner(bracket: BracketLike, matchId: string): BracketLike | null {
+  const b = cloneBracket(bracket);
+  const loc = findBracketMatchLocation(b, matchId);
+  if (!loc) return null;
+  const { round, sliceRounds } = loc;
+  const matchIndex = round.matches.findIndex((m) => m.id === matchId);
+  const cutRn = round.roundNumber;
+  const nextRn = cutRn + 1;
+
+  clearMatchResultInPlace(loc.match);
+  refreshRoundStatusFromMatches(loc.round);
+
+  if (matchIndex >= 0) {
+    const nextRound = sliceRounds.find((r) => r.roundNumber === nextRn);
+    if (nextRound) {
+      const nextMatchIndex = Math.floor(matchIndex / 2);
+      const slot: "player1" | "player2" = matchIndex % 2 === 0 ? "player1" : "player2";
+      const nm = nextRound.matches[nextMatchIndex];
+      if (nm) {
+        nm[slot] = emptyBracketSlot();
+        clearMatchResultInPlace(nm);
+        refreshRoundStatusFromMatches(nextRound);
+      }
+    }
+  }
+
+  for (const r of sliceRounds) {
+    if (r.roundNumber <= nextRn) continue;
+    for (const m of r.matches) {
+      clearMatchResultInPlace(m);
+      m.player1 = emptyBracketSlot();
+      m.player2 = emptyBracketSlot();
+    }
+    refreshRoundStatusFromMatches(r);
+  }
+
+  pruneSliceRoundsWithoutEligibleParticipants(sliceRounds, cutRn);
+  return b;
 }
 
 /** 단일 매치 승자만 제거 */

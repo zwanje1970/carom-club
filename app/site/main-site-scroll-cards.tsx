@@ -9,6 +9,7 @@ import deckShellStyles from "./main-site-scroll-tournament-deck-shell.module.css
 import {
   clearMainScrollDeckImageDecodeCacheForUrl,
   decodeMainScrollDeckImageOnce,
+  isMainScrollDeckImageDecodeDone,
 } from "../../lib/site/main-scroll-deck-image-decode";
 import { isMainSiteLoadDiagEnabled, logMainSiteLoadDiag } from "../../lib/site/main-site-load-diag";
 import {
@@ -73,34 +74,74 @@ const MAIN_SHAKE_DIAG_COPY_BUTTON_STYLE: CSSProperties = {
   boxShadow: "0 2px 8px rgba(0,0,0,0.28)",
 };
 
+type MainCardReturnKickStats = {
+  foundImages: number;
+  reloadedImages: number;
+  decodedImages: number;
+};
+
+function logMainCardReturn(
+  phase: string,
+  stats?: Pick<MainCardReturnKickStats, "foundImages" | "reloadedImages" | "decodedImages">,
+): void {
+  if (typeof console === "undefined" || typeof console.info !== "function") return;
+  const parts = [`[main-card-return] phase=${phase}`];
+  if (stats) {
+    parts.push(`foundImages=${stats.foundImages}`);
+    parts.push(`reloadedImages=${stats.reloadedImages}`);
+    if (stats.decodedImages !== undefined) {
+      parts.push(`decodedImages=${stats.decodedImages}`);
+    }
+  }
+  console.info(parts.join(" "));
+}
+
 /** 홈 복귀·스크롤 복원 후 lazy img가 뷰포트에 남는 WebView 표시 누락 보정 — 뷰포트 내 img만 */
-function kickVisibleMainScrollDeckImages(viewport: HTMLElement): void {
+function kickVisibleMainScrollDeckImages(viewport: HTMLElement): MainCardReturnKickStats {
   const vRect = viewport.getBoundingClientRect();
   const imgs = viewport.querySelectorAll<HTMLImageElement>(`img.${styles.sampleMainCardPosterPublishedSnapshot}`);
+  let foundImages = 0;
+  let reloadedImages = 0;
+  let decodedImages = 0;
   for (const img of imgs) {
     const r = img.getBoundingClientRect();
     if (r.bottom < vRect.top - 8 || r.top > vRect.bottom + 8) continue;
     const src = (img.currentSrc || img.src || "").trim();
     if (!src) continue;
+    foundImages += 1;
     img.dataset.forceVisible = "1";
     const needsReload = !img.complete || img.naturalWidth <= 0;
     if (needsReload) {
+      reloadedImages += 1;
       clearMainScrollDeckImageDecodeCacheForUrl(src);
       img.loading = "eager";
       img.src = src;
+    }
+    if (!isMainScrollDeckImageDecodeDone(src)) {
+      decodedImages += 1;
     }
     decodeMainScrollDeckImageOnce(img);
     requestAnimationFrame(() => {
       decodeMainScrollDeckImageOnce(img);
     });
   }
+  return { foundImages, reloadedImages, decodedImages };
 }
 
 /** 즉시 1회 + rAF 1회 — WebView lazy 재감지 */
-function scheduleKickVisibleMainScrollDeckImages(viewport: HTMLElement) {
+function scheduleKickVisibleMainScrollDeckImages(
+  viewport: HTMLElement,
+  source?: "pageshow" | "session-restore",
+) {
   kickVisibleMainScrollDeckImages(viewport);
   requestAnimationFrame(() => {
-    kickVisibleMainScrollDeckImages(viewport);
+    const stats = kickVisibleMainScrollDeckImages(viewport);
+    logMainCardReturn("kick-visible-images", stats);
+    if (source === "pageshow") {
+      logMainCardReturn("pageshow-kick-done", stats);
+    } else if (source === "session-restore") {
+      logMainCardReturn("session-restore-kick-done", stats);
+    }
   });
 }
 
@@ -442,8 +483,11 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onPageShow = (_ev: PageTransitionEvent) => {
+      logMainCardReturn("pageshow");
       const viewport = viewportRef.current;
-      if (viewport) scheduleKickVisibleMainScrollDeckImages(viewport);
+      if (!viewport) return;
+      logMainCardReturn("pageshow-kick-scheduled");
+      scheduleKickVisibleMainScrollDeckImages(viewport, "pageshow");
     };
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
@@ -558,7 +602,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
     };
 
     apply();
-    scheduleKickVisibleMainScrollDeckImages(viewport);
+    logMainCardReturn("session-restore-kick-scheduled");
+    scheduleKickVisibleMainScrollDeckImages(viewport, "session-restore");
     let rafOuter: number | null = requestAnimationFrame(() => {
       rafOuter = null;
       apply();

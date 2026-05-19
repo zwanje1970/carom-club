@@ -21,9 +21,10 @@ import {
   appendOfflinePending,
   applyLocalClearWinner,
   applyLocalClearWinnerCascadeInSlice,
+  applyLocalQuickResultsClearWinner,
+  applyLocalQuickResultsWinnerPick,
   applyLocalRenamePlayer,
   applyLocalSwapPlayers,
-  applyLocalWinnerPick,
   bracketOfflineSegment,
   bumpBracketLocalAuthorityRev,
   readBracketLocalAuthorityRev,
@@ -500,6 +501,44 @@ function bracketRoundHasRecordedResult(r: BracketRoundDoc): boolean {
   return false;
 }
 
+const BRACKET_ADVANCE_INSUFFICIENT_PAIRS_MSG = "다음 라운드를 만들 승자 페어가 부족합니다.";
+
+function shouldSuppressBracketProgressUserMessage(message: string): boolean {
+  return message.includes(BRACKET_ADVANCE_INSUFFICIENT_PAIRS_MSG);
+}
+
+function bracketProgressStatusLine(saveStateText: string, message: string): string {
+  const msg = shouldSuppressBracketProgressUserMessage(message) ? "" : message.trim();
+  const save =
+    shouldSuppressBracketProgressUserMessage(message) && saveStateText === "오류 발생" ? "" : saveStateText;
+  return [save, msg].filter(Boolean).join(" · ");
+}
+
+function quickResultsRoundSlotSubtitle(matchCount: number): string {
+  const size = Math.max(2, matchCount * 2);
+  return `${matchCount}경기 · ${size}강`;
+}
+
+function quickResultsFinalistAdvanceLine(
+  bracket: Bracket,
+  boardSliceKey: string | null,
+  displayRounds: BracketRoundDoc[],
+): string | null {
+  if (!bracket.finalBlock?.rounds?.length) return null;
+  if (!boardSliceKey?.startsWith("block:")) return null;
+  const sorted = [...displayRounds].sort((a, b) => a.roundNumber - b.roundNumber);
+  if (!sorted.length) return null;
+  const lastRound = sorted[sorted.length - 1]!;
+  if (lastRound.matches.length !== 1) return null;
+  if (lastRound.status !== "COMPLETED") return null;
+  const match = lastRound.matches[0];
+  if (!match || match.status !== "COMPLETED") return null;
+  const winnerId = typeof match.winnerUserId === "string" ? match.winnerUserId.trim() : "";
+  if (!winnerId || !isEligibleBracketWinnerUserId(winnerId)) return null;
+  const winnerSlot = winnerId === match.player1.userId ? match.player1 : match.player2;
+  return `${bracketSlotLabel(winnerSlot)} 결선 진출`;
+}
+
 function quickBracketRoundShuffleBlockedReason(sliceRounds: BracketRoundDoc[], round: BracketRoundDoc): string | null {
   if (bracketRoundHasRecordedResult(round)) return "이미 결과가 입력된 라운드는 재섞기할 수 없습니다.";
   return getShuffleRoundBlockedReason(sliceRounds, round.roundNumber);
@@ -520,8 +559,8 @@ function quickResultsRoundCardTitle(bracket: Bracket, boardSliceKey: string | nu
   const size = Math.max(2, matches * 2);
   const idx = String(round.roundNumber).padStart(2, "0");
   if (boardSliceKey === "final") {
-    if (matches === 1) return "결승";
-    if (matches === 2 && size <= 4) return "준결승";
+    if (matches === 1) return "2강";
+    if (matches === 2 && size <= 4) return "4강";
     return `결선 ${size}강`;
   }
   if (boardSliceKey?.startsWith("block:")) {
@@ -875,6 +914,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   const [applicationListItems, setApplicationListItems] = useState<HubApplicationListItem[]>([]);
   const [applicationListLoading, setApplicationListLoading] = useState(false);
   const [quickResultsRoundExpanded, setQuickResultsRoundExpanded] = useState<Record<number, boolean>>({});
+  const [quickResultsRoundMenuOpen, setQuickResultsRoundMenuOpen] = useState<number | null>(null);
   const confirmedSectionRef = useRef<HTMLDivElement | null>(null);
   const didInitialBoardFocusRef = useRef(false);
 
@@ -1066,7 +1106,13 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
   useEffect(() => {
     if (variant !== "quickResults") return;
     setQuickResultsRoundExpanded({});
+    setQuickResultsRoundMenuOpen(null);
   }, [variant, bracket?.id, boardSliceKey]);
+
+  const quickResultsFinalistLine = useMemo(() => {
+    if (variant !== "quickResults" || !bracket) return null;
+    return quickResultsFinalistAdvanceLine(bracket, boardSliceKey, displayRounds);
+  }, [variant, bracket, boardSliceKey, displayRounds]);
 
   const bracketHasRecordedWinners = useMemo(() => bracketHasAnyRecordedWinner(bracket), [bracket]);
 
@@ -1678,6 +1724,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           /** 로컬 정본 우선: 서버 응답 bracket으로 화면을 덮어쓰지 않음 */
           work =
             (bracketRef.current as BracketLike | null) ??
+            applyLocalQuickResultsClearWinner(work as BracketLike, op.matchId) ??
             applyLocalClearWinnerCascadeInSlice(work as BracketLike, op.matchId) ??
             (rs.bracket as BracketLike);
         } else if (op.type === "rename") {
@@ -1884,7 +1931,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           });
         }
       }
-      const next = applyLocalClearWinnerCascadeInSlice(snap, trimmedId);
+      const next = applyLocalQuickResultsClearWinner(snap, trimmedId);
       if (!next) {
         setSaveState("error");
         setMessage("승패 결과를 취소할 수 없습니다.");
@@ -1946,7 +1993,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
         setMessage("승자 변경은 네트워크 연결 후 진행해 주세요.");
         return;
       }
-      const next = applyLocalWinnerPick(current as unknown as BracketLike, matchId, winnerUserId);
+      const next = applyLocalQuickResultsWinnerPick(current as unknown as BracketLike, matchId, winnerUserId);
       if (!next) {
         setMessage("경기 결과를 반영할 수 없습니다.");
         return;
@@ -2012,8 +2059,13 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               writeLastGoodBracket(tournamentId, seg, nextBracket);
               const finalProcessedEarly = await processFinalCompletion(nextBracket);
               if (!finalProcessedEarly) {
-                setSaveState("error");
-                setMessage(advResult.error);
+                if (shouldSuppressBracketProgressUserMessage(advResult.error)) {
+                  setSaveState("idle");
+                  setMessage("");
+                } else {
+                  setSaveState("error");
+                  setMessage(advResult.error);
+                }
               }
               return;
             }
@@ -2036,7 +2088,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
     }
 
     const before = current;
-    const optimistic = applyLocalWinnerPick(before as unknown as BracketLike, matchId, winnerUserId);
+    const optimistic = applyLocalQuickResultsWinnerPick(before as unknown as BracketLike, matchId, winnerUserId);
     if (!optimistic) {
       setMessage("경기 결과를 반영할 수 없습니다.");
       return;
@@ -2098,8 +2150,13 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
               }
               const finalProcessedEarly = await processFinalCompletion(nextBracket);
               if (!finalProcessedEarly) {
-                setSaveState("error");
-                setMessage(advResult.error);
+                if (shouldSuppressBracketProgressUserMessage(advResult.error)) {
+                  setSaveState("idle");
+                  setMessage("");
+                } else {
+                  setSaveState("error");
+                  setMessage(advResult.error);
+                }
               }
               return;
             }
@@ -2595,7 +2652,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
           }}
         >
           <h1 className="v3-h2" style={{ margin: 0, fontSize: "clamp(1rem, 4vw, 1.15rem)", fontWeight: 700 }}>
-            빠른 결과 입력
+            대회 진행
           </h1>
           <div className="v3-row" style={{ alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
             <button
@@ -2727,6 +2784,11 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                   actionLoading ||
                   interactionLocked ||
                   multiBlockBusy;
+                const showRoundMenu =
+                  role !== "completed" &&
+                  round.matches.length > 1 &&
+                  !bracketRoundHasRecordedResult(round);
+                const roundMenuOpen = quickResultsRoundMenuOpen === round.roundNumber;
                 const showBody = role !== "completed" || expanded;
                 return (
               <section
@@ -2765,7 +2827,7 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                       </span>
                     </div>
                     <span style={{ fontSize: "0.72rem", color: "#64748b" }}>
-                      {round.matches.length}경기 · {round.matches.length * 2}명 슬롯
+                      {quickResultsRoundSlotSubtitle(round.matches.length)}
                     </span>
                   </div>
                   <div className="v3-row" style={{ gap: "0.25rem", flexWrap: "wrap", alignItems: "center" }}>
@@ -2787,38 +2849,87 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                           }))
                         }
                       >
-                        {expanded ? "접기" : "펼치기"}
+                        {expanded ? "닫기" : "펼치기"}
                       </button>
                     ) : null}
-                    {round.matches.length > 1 ? (
-                    <button
-                      type="button"
-                      className="v3-btn"
-                      title={
-                        !quickSplitShuffleReady
-                          ? "예선 조 또는 결선을 선택한 뒤 사용하세요."
-                          : shuffleBlock ?? undefined
-                      }
-                      disabled={shuffleDisabled}
-                      style={{
-                        minHeight: 32,
-                        padding: "0.2rem 0.45rem",
-                        fontSize: "0.78rem",
-                        fontWeight: 700,
-                        boxShadow: "none",
-                      }}
-                      onClick={() => {
-                        if (!bracket) return;
-                        setBracketHubModal({
-                          type: "shuffleRegenConfirm",
-                          roundNumber: round.roundNumber,
-                          scope: shuffleScopeForSlice(bracket, boardSliceKey),
-                          shuffleUi: "quickCard",
-                        });
-                      }}
-                    >
-                      대진 재생성
-                    </button>
+                    {showRoundMenu ? (
+                      <div style={{ position: "relative" }}>
+                        <button
+                          type="button"
+                          className="v3-btn"
+                          aria-expanded={roundMenuOpen}
+                          aria-haspopup="menu"
+                          aria-label="라운드 메뉴"
+                          style={{
+                            minHeight: 32,
+                            minWidth: 32,
+                            padding: "0.2rem 0.45rem",
+                            fontSize: "1.05rem",
+                            lineHeight: 1,
+                            fontWeight: 700,
+                            boxShadow: "none",
+                          }}
+                          onClick={() =>
+                            setQuickResultsRoundMenuOpen((prev) =>
+                              prev === round.roundNumber ? null : round.roundNumber,
+                            )
+                          }
+                        >
+                          ⋮
+                        </button>
+                        {roundMenuOpen ? (
+                          <div
+                            role="menu"
+                            style={{
+                              position: "absolute",
+                              top: "calc(100% + 0.2rem)",
+                              right: 0,
+                              zIndex: 20,
+                              minWidth: "7.5rem",
+                              background: "#fff",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: 8,
+                              boxShadow: "0 8px 20px rgba(15, 23, 42, 0.12)",
+                              overflow: "hidden",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              role="menuitem"
+                              title={
+                                !quickSplitShuffleReady
+                                  ? "예선 조 또는 결선을 선택한 뒤 사용하세요."
+                                  : shuffleBlock ?? undefined
+                              }
+                              disabled={shuffleDisabled}
+                              style={{
+                                display: "block",
+                                width: "100%",
+                                border: "none",
+                                background: "transparent",
+                                textAlign: "left",
+                                padding: "0.45rem 0.65rem",
+                                fontSize: "0.78rem",
+                                fontWeight: 700,
+                                color: shuffleDisabled ? "#94a3b8" : "#0f172a",
+                                cursor: shuffleDisabled ? "not-allowed" : "pointer",
+                              }}
+                              onClick={() => {
+                                if (!bracket) return;
+                                setQuickResultsRoundMenuOpen(null);
+                                setBracketHubModal({
+                                  type: "shuffleRegenConfirm",
+                                  roundNumber: round.roundNumber,
+                                  scope: shuffleScopeForSlice(bracket, boardSliceKey),
+                                  shuffleUi: "quickCard",
+                                });
+                              }}
+                            >
+                              대진 재생성
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 </div>
@@ -3020,15 +3131,29 @@ export default function BracketManageClient({ variant = "full" }: { variant?: "f
                 );
               })
             )}
-            {connectivityHint || saveStateText || message ? (
-              <p className="v3-muted">
-                {connectivityHint}
-                {connectivityHint && (saveStateText || message) ? " · " : ""}
-                {saveStateText}
-                {saveStateText && message ? " · " : ""}
-                {message}
+            {quickResultsFinalistLine ? (
+              <p
+                style={{
+                  margin: "0.35rem 0 0",
+                  fontWeight: 700,
+                  fontSize: "0.88rem",
+                  color: "#0f172a",
+                  textAlign: "center",
+                }}
+              >
+                {quickResultsFinalistLine}
               </p>
             ) : null}
+            {(() => {
+              const statusTail = bracketProgressStatusLine(saveStateText, message);
+              return connectivityHint || statusTail ? (
+                <p className="v3-muted">
+                  {connectivityHint}
+                  {connectivityHint && statusTail ? " · " : ""}
+                  {statusTail}
+                </p>
+              ) : null;
+            })()}
           </>
         )}
         <QuickResultDetailModal
