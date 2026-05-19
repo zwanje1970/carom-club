@@ -241,8 +241,6 @@ type CardRowProps = {
   onCardPointerDown: (itemId: string) => void;
   /** CTA 탭 시 자동 선택취소 타이머 제거(상세 진입) */
   onShortcutActivate?: () => void;
-  /** segment b는 레이아웃만 복제하고 실제 이미지 요청은 segment a 한 세트만 맡는다. */
-  renderDeckImage?: boolean;
   /** 문서 순서상 첫 번째 면 이미지(LCP 후보) — 링크 preload 없이 img 우선순위만 부여 */
   lcpHeroImage?: boolean;
   /** 초기 뷰포트 근처 카드(이미지 있는 앞 N장): loading eager — LCP high는 lcpHeroImage만 */
@@ -281,7 +279,6 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
   selected,
   onCardPointerDown,
   onShortcutActivate,
-  renderDeckImage = true,
   lcpHeroImage = false,
   prioritizeNearViewportImage = false,
   onLcpHeroImageLoad,
@@ -369,29 +366,27 @@ const MainSiteCardRow = memo(function MainSiteCardRow({
                       className={`${deckShellStyles.mainScrollDeckCardInner} ${deckShellStyles.mainScrollDeckCardInnerFlex}`}
                     >
                       <div className={styles.sampleMainCardPublishedInner}>
-                        {renderDeckImage ? (
-                          <img
-                            ref={imgRef}
-                            src={deckImgUrl}
-                            alt=""
-                            className={styles.sampleMainCardPosterPublishedSnapshot}
-                            data-site-scroll-deck-img=""
-                            decoding={prioritizeNearViewportImage ? "sync" : "async"}
-                            loading={prioritizeNearViewportImage || lcpHeroImage ? "eager" : "lazy"}
-                            {...(lcpHeroImage
-                              ? { fetchPriority: "high" as const }
-                              : prioritizeNearViewportImage
-                                ? { fetchPriority: "auto" as const }
-                                : {})}
-                            onLoad={() => {
-                              onImageLoad();
-                              if (lcpHeroImage) onLcpHeroImageLoad?.();
-                            }}
-                            onError={() => {
-                              if (lcpHeroImage) onLcpHeroImageError?.();
-                            }}
-                          />
-                        ) : null}
+                        <img
+                          ref={imgRef}
+                          src={deckImgUrl}
+                          alt=""
+                          className={styles.sampleMainCardPosterPublishedSnapshot}
+                          data-site-scroll-deck-img=""
+                          decoding={prioritizeNearViewportImage ? "sync" : "async"}
+                          loading={prioritizeNearViewportImage || lcpHeroImage ? "eager" : "lazy"}
+                          {...(lcpHeroImage
+                            ? { fetchPriority: "high" as const }
+                            : prioritizeNearViewportImage
+                              ? { fetchPriority: "auto" as const }
+                              : {})}
+                          onLoad={() => {
+                            onImageLoad();
+                            if (lcpHeroImage) onLcpHeroImageLoad?.();
+                          }}
+                          onError={() => {
+                            if (lcpHeroImage) onLcpHeroImageError?.();
+                          }}
+                        />
                         {item.slideDeckPngAdMark ? (
                           <span className={siteStyles.slideDeckPngAdMark} aria-hidden>
                             AD
@@ -1183,7 +1178,6 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
               selected={selectedItemId === item.id}
               onCardPointerDown={onCardPointerDown}
               onShortcutActivate={clearAutoDeselectTimer}
-              renderDeckImage={segmentKey === "a"}
               lcpHeroImage={lcpHeroImage}
               prioritizeNearViewportImage={prioritizeNearViewportImage}
               onLcpHeroImageLoad={lcpHeroImage ? onLcpHeroImageLoad : undefined}
