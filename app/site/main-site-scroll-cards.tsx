@@ -164,7 +164,7 @@ const SITE_SCROLL_SHORTCUT = "data-site-scroll-shortcut";
 /** segment a+b 합산 DOM 상한 — WebView 메모리·이미지 부담 완화 */
 export const MAX_RENDERED_SCROLL_ITEMS = 48;
 
-/** segment a·b 각각 — 이미지 있는 앞 N장만 loading=eager (나머지 lazy) */
+/** segment a만 — 이미지 있는 앞 N장 loading=eager (segment b는 전부 lazy, 비교 실험) */
 const INITIAL_EAGER_IMAGE_COUNT_PER_SEGMENT = 6;
 
 function logMainScrollRenderCountLimit(payload: {
@@ -1164,7 +1164,8 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
         const rowKey = `${segmentKey}-${item.id}`;
         const lcpHeroImage =
           segmentKey === "a" && itemIndex === lcpHeroItemIndex && lcpHeroItemIndex >= 0;
-        const prioritizeNearViewportImage = initialPriorityIndexes.includes(itemIndex);
+        const prioritizeNearViewportImage =
+          segmentKey === "a" && initialPriorityIndexes.includes(itemIndex);
         return (
           <div
             key={rowKey}
