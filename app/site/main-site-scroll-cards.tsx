@@ -821,6 +821,9 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   const mainShakePrevCardTopRef = useRef<number | null>(null);
   const mainShakePrevCardLeftRef = useRef<number | null>(null);
   const mainShakeRafStartedAtRef = useRef<number | null>(null);
+  const v2AutoSlideRafRef = useRef<number | null>(null);
+  const v2AutoSlideLastFrameRef = useRef<number | null>(null);
+  const v2AutoSlideResumeTimerRef = useRef<number | null>(null);
 
   const lcpHeroItemIndex = useMemo(
     () => renderItems.findIndex((x) => Boolean(x.imageUrl?.trim())),
@@ -1124,16 +1127,12 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   }, [clearCardSelection, selectedItemId]);
 
   useEffect(() => {
-    if (useV2) {
-      setAutoSlideReady(false);
-      return;
-    }
     if (items.length === 0) {
       setAutoSlideReady(false);
       return;
     }
     let cancelled = false;
-    const delayMs = sessionRestoreAppliedRef.current ? 900 : 220;
+    const delayMs = useV2 ? 220 : sessionRestoreAppliedRef.current ? 900 : 220;
     const timer = window.setTimeout(() => {
       if (!cancelled) setAutoSlideReady(true);
     }, delayMs);
@@ -1143,6 +1142,113 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       setAutoSlideReady(false);
     };
   }, [itemsIdsKey, items.length, useV2]);
+
+  useEffect(() => {
+    if (!useV2) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    if (items.length === 0) return;
+    if (!autoSlideReady) return;
+
+    const speedLevel = Number.isFinite(slideCardMoveSpeedLevel)
+      ? Math.min(10, Math.max(1, Math.round(slideCardMoveSpeedLevel)))
+      : 5;
+    const restartAfterUserInputMs = 1800;
+    const fallbackPxPerSec = 22;
+    const baseTravelSec = 9;
+    let pausedByUser = false;
+
+    const stopAutoSlide = () => {
+      if (v2AutoSlideRafRef.current !== null) {
+        cancelAnimationFrame(v2AutoSlideRafRef.current);
+        v2AutoSlideRafRef.current = null;
+      }
+      v2AutoSlideLastFrameRef.current = null;
+    };
+
+    const startAutoSlide = () => {
+      if (selectedItemId !== null || pausedByUser) return;
+      if (v2AutoSlideRafRef.current !== null) return;
+      logMainCardReturn("v2-auto-slide-start");
+      v2AutoSlideRafRef.current = requestAnimationFrame(step);
+    };
+
+    const scheduleResume = () => {
+      if (v2AutoSlideResumeTimerRef.current !== null) {
+        window.clearTimeout(v2AutoSlideResumeTimerRef.current);
+      }
+      pausedByUser = true;
+      stopAutoSlide();
+      if (selectedItemId !== null) return;
+      v2AutoSlideResumeTimerRef.current = window.setTimeout(() => {
+        pausedByUser = false;
+        startAutoSlide();
+      }, restartAfterUserInputMs);
+    };
+
+    const onUserInput = () => {
+      scheduleResume();
+    };
+
+    const onScroll = () => {
+      if (performance.now() <= programmaticScrollUntilMsRef.current) return;
+      scheduleResume();
+    };
+
+    const step = (frameTime: number) => {
+      const node = viewportRef.current;
+      if (!node) {
+        stopAutoSlide();
+        return;
+      }
+      if (selectedItemId !== null || pausedByUser) {
+        stopAutoSlide();
+        return;
+      }
+      const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
+      if (maxScrollTop <= 0) {
+        v2AutoSlideRafRef.current = requestAnimationFrame(step);
+        return;
+      }
+      const prevTime = v2AutoSlideLastFrameRef.current ?? frameTime;
+      const dtSec = Math.max(0, (frameTime - prevTime) / 1000);
+      v2AutoSlideLastFrameRef.current = frameTime;
+      let pxPerSec = fallbackPxPerSec;
+      if (node.clientHeight > 0) {
+        pxPerSec = (node.clientHeight * speedLevel) / (baseTravelSec * 5);
+      }
+      if (!Number.isFinite(pxPerSec) || pxPerSec <= 0) pxPerSec = fallbackPxPerSec;
+      const delta = pxPerSec * dtSec;
+      const nextTop = node.scrollTop + delta;
+      programmaticScrollUntilMsRef.current = performance.now() + 120;
+      node.scrollTop = nextTop >= maxScrollTop ? 0 : nextTop;
+      v2AutoSlideRafRef.current = requestAnimationFrame(step);
+    };
+
+    viewport.addEventListener("touchstart", onUserInput, { passive: true });
+    viewport.addEventListener("touchmove", onUserInput, { passive: true });
+    viewport.addEventListener("wheel", onUserInput, { passive: true });
+    viewport.addEventListener("pointerdown", onUserInput, { passive: true });
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+
+    if (selectedItemId === null) {
+      startAutoSlide();
+    }
+
+    return () => {
+      viewport.removeEventListener("touchstart", onUserInput);
+      viewport.removeEventListener("touchmove", onUserInput);
+      viewport.removeEventListener("wheel", onUserInput);
+      viewport.removeEventListener("pointerdown", onUserInput);
+      viewport.removeEventListener("scroll", onScroll);
+      if (v2AutoSlideResumeTimerRef.current !== null) {
+        window.clearTimeout(v2AutoSlideResumeTimerRef.current);
+        v2AutoSlideResumeTimerRef.current = null;
+      }
+      logMainCardReturn("v2-auto-slide-stop");
+      stopAutoSlide();
+    };
+  }, [autoSlideReady, items.length, selectedItemId, slideCardMoveSpeedLevel, useV2]);
 
   /** 탭 이동·복귀 시에도 스크롤 위치가 반영되도록 언마운트만이 아닌 스크롤 중 저장 */
   useEffect(() => {
@@ -1183,6 +1289,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   }, [itemsIdsKey, items.length, useV2]);
 
   useEffect(() => {
+    if (useV2) return;
     const viewport = viewportRef.current;
     if (!viewport) return;
     if (items.length === 0) return;
@@ -1505,7 +1612,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       programmaticScrollUntilMsRef.current = 0;
       scrollPixelCarryRef.current = 0;
     };
-  }, [itemsIdsKey, items.length, slideCardMoveSpeedLevel, selectedItemId, autoSlideReady]);
+  }, [itemsIdsKey, items.length, slideCardMoveSpeedLevel, selectedItemId, autoSlideReady, useV2]);
 
   const showMainShakeDiagCopyButton = isMainScrollShakeDiagEnabled();
 

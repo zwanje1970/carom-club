@@ -67,10 +67,16 @@ function snapshotToTournamentSlideDeckItem(snapshot: PublishedCardSnapshot): Sli
   };
 }
 
-function collectHeroImagePreloadUrls(scrollItems: { imageUrl: string | null }[], limit = 2): string[] {
+function collectHeroImagePreloadUrls(
+  scrollItems: { imageUrl: string | null; directImageUrl?: string | null }[],
+  limit = 2,
+  useV2Direct = false,
+): string[] {
   const out: string[] = [];
   for (const item of scrollItems) {
-    const url = item.imageUrl?.trim() ?? "";
+    const fallback = item.imageUrl?.trim() ?? "";
+    const direct = item.directImageUrl?.trim() ?? "";
+    const url = useV2Direct ? direct || fallback : fallback;
     if (!url || out.includes(url)) continue;
     out.push(url);
     if (out.length >= limit) break;
@@ -98,7 +104,12 @@ export default async function SiteOperationalHome() {
     adSettings.activeAds,
     adSettings.config,
   );
-  const heroPreloadUrls = collectHeroImagePreloadUrls(slideDeckItemsToScrollCards(tournamentBaseForSlide));
+  const useV2DirectPreload = process.env.NEXT_PUBLIC_MAIN_SLIDE_ENGINE_V2 === "1";
+  const heroPreloadUrls = collectHeroImagePreloadUrls(
+    slideDeckItemsToScrollCards(tournamentBaseForSlide),
+    2,
+    useV2DirectPreload,
+  );
 
   if (isMainSiteLoadDiagEnabled()) {
     const scrollForDiag = slideDeckItemsToScrollCards(initialSlideDeckItems);
