@@ -167,6 +167,165 @@ export const MAX_RENDERED_SCROLL_ITEMS = 48;
 /** segment a만 — 이미지 있는 앞 N장 loading=eager (segment b는 전부 lazy, 비교 실험) */
 const INITIAL_EAGER_IMAGE_COUNT_PER_SEGMENT = 6;
 
+/**
+ * v2 준비(미연결): 실험 플래그 이름만 고정.
+ * 실제 분기 연결은 다음 단계에서 진행.
+ */
+export const MAIN_SLIDE_ENGINE_V2_FLAG_ENV = "NEXT_PUBLIC_MAIN_SLIDE_ENGINE_V2";
+
+/** v2 준비(미연결): 실험 플래그 읽기 — 기본값 false(v1 유지) */
+export function isMainSlideEngineV2Enabled(): boolean {
+  const raw = process.env.NEXT_PUBLIC_MAIN_SLIDE_ENGINE_V2;
+  if (raw == null) return false;
+  const v = raw.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "on" || v === "yes";
+}
+
+/** v2 준비(미연결): viewport 기준 visible window 계산용 버퍼 설정 */
+export type MainSlideEngineV2BufferConfig = {
+  /** 현재 화면 위쪽으로 유지할 카드 수 */
+  beforeViewportCards: number;
+  /** 현재 화면 아래쪽으로 미리 유지할 카드 수 */
+  afterViewportCards: number;
+};
+
+/** v2 준비(미연결): 기본 버퍼(요구사항 기준 3~4 / 5~6 장) */
+export const MAIN_SLIDE_ENGINE_V2_DEFAULT_BUFFER: MainSlideEngineV2BufferConfig = {
+  beforeViewportCards: 4,
+  afterViewportCards: 6,
+};
+
+/** v2 준비(미연결): viewport 기준 계산 입력 */
+export type MainSlideEngineV2ViewportMetrics = {
+  totalCards: number;
+  scrollTopPx: number;
+  viewportHeightPx: number;
+  estimatedCardHeightPx: number;
+};
+
+/** v2 준비(미연결): 실제 DOM 카드 높이 샘플링 설정 */
+export type MainSlideEngineV2MeasureOptions = {
+  /** 샘플링할 최대 카드 수 */
+  maxSamples: number;
+  /** 카드 선택자(기본: 메인 카드 슬롯 data attribute) */
+  cardSelector: string;
+};
+
+/** v2 준비(미연결): DOM 카드 높이 실측 결과 */
+export type MainSlideEngineV2MeasuredCardHeights = {
+  sampleHeightsPx: number[];
+  sampledCount: number;
+};
+
+/** v2 준비(미연결): resize/orientation 대응용 뷰포트 시그니처 */
+export type MainSlideEngineV2ViewportSignature = {
+  widthPx: number;
+  heightPx: number;
+  orientation: "portrait" | "landscape" | "unknown";
+};
+
+/** v2 준비(미연결): viewport 기반 카드 실측 기본 옵션 */
+export const MAIN_SLIDE_ENGINE_V2_DEFAULT_MEASURE_OPTIONS: MainSlideEngineV2MeasureOptions = {
+  maxSamples: 16,
+  cardSelector: `[${SITE_SCROLL_CARD}]`,
+};
+
+/** v2 준비(미연결): viewport 기준 visible window 결과 */
+export type MainSlideEngineV2VisibleWindow = {
+  firstVisibleIndex: number;
+  lastVisibleIndex: number;
+  windowStartIndex: number;
+  windowEndIndex: number;
+};
+
+/** v2 준비(미연결): 현재 viewport 크기·방향 시그니처 */
+export function readMainSlideEngineV2ViewportSignature(viewport: HTMLElement): MainSlideEngineV2ViewportSignature {
+  const widthPx = Math.max(0, viewport.clientWidth);
+  const heightPx = Math.max(0, viewport.clientHeight);
+  let orientation: "portrait" | "landscape" | "unknown" = "unknown";
+  if (widthPx > 0 && heightPx > 0) {
+    orientation = heightPx >= widthPx ? "portrait" : "landscape";
+  }
+  return { widthPx, heightPx, orientation };
+}
+
+/** v2 준비(미연결): resize/orientation 재측정 트리거용 키 */
+export function toMainSlideEngineV2ViewportSignatureKey(sig: MainSlideEngineV2ViewportSignature): string {
+  return `${sig.widthPx}x${sig.heightPx}:${sig.orientation}`;
+}
+
+/**
+ * v2 준비(미연결): 현재 렌더된 카드 DOM 높이 샘플링.
+ * 실제 v2 연결 단계에서 viewport/resize 이벤트와 묶어 재측정한다.
+ */
+export function measureMainSlideEngineV2CardHeightsFromDom(
+  viewport: HTMLElement,
+  options: MainSlideEngineV2MeasureOptions = MAIN_SLIDE_ENGINE_V2_DEFAULT_MEASURE_OPTIONS,
+): MainSlideEngineV2MeasuredCardHeights {
+  const maxSamples = Math.max(1, Math.floor(options.maxSamples));
+  const selector = options.cardSelector || `[${SITE_SCROLL_CARD}]`;
+  const nodes = viewport.querySelectorAll<HTMLElement>(selector);
+  const sampleHeightsPx: number[] = [];
+  for (const node of nodes) {
+    if (sampleHeightsPx.length >= maxSamples) break;
+    const h = node.getBoundingClientRect().height;
+    if (!Number.isFinite(h) || h <= 0) continue;
+    sampleHeightsPx.push(h);
+  }
+  return { sampleHeightsPx, sampledCount: sampleHeightsPx.length };
+}
+
+/**
+ * v2 준비(미연결): 카드 높이 추정치.
+ * 실제 연결 시 viewport 내 카드 높이 샘플값을 넘겨 사용.
+ */
+export function estimateMainSlideEngineV2CardHeightPx(args: {
+  sampleCardHeightsPx: number[];
+  fallbackPx: number;
+}): number {
+  const finite = args.sampleCardHeightsPx.filter((v) => Number.isFinite(v) && v > 0).sort((a, b) => a - b);
+  if (finite.length === 0) return Math.max(1, args.fallbackPx);
+  const mid = Math.floor(finite.length / 2);
+  const median = finite.length % 2 === 0 ? (finite[mid - 1]! + finite[mid]!) / 2 : finite[mid]!;
+  return Math.max(1, median);
+}
+
+/**
+ * v2 준비(미연결): viewport 기준 visible window 계산.
+ * 현재 v1 렌더에는 연결하지 않는다.
+ */
+export function computeMainSlideEngineV2VisibleWindow(
+  metrics: MainSlideEngineV2ViewportMetrics,
+  buffer: MainSlideEngineV2BufferConfig = MAIN_SLIDE_ENGINE_V2_DEFAULT_BUFFER,
+): MainSlideEngineV2VisibleWindow {
+  const total = Math.max(0, Math.floor(metrics.totalCards));
+  if (total <= 0) {
+    return {
+      firstVisibleIndex: 0,
+      lastVisibleIndex: 0,
+      windowStartIndex: 0,
+      windowEndIndex: 0,
+    };
+  }
+  const cardH = Math.max(1, metrics.estimatedCardHeightPx);
+  const scrollTop = Math.max(0, metrics.scrollTopPx);
+  const viewportH = Math.max(1, metrics.viewportHeightPx);
+  const maxIdx = total - 1;
+
+  const firstVisible = Math.min(maxIdx, Math.max(0, Math.floor(scrollTop / cardH)));
+  const lastVisible = Math.min(maxIdx, Math.max(firstVisible, Math.floor((scrollTop + viewportH - 1) / cardH)));
+
+  const before = Math.max(0, Math.floor(buffer.beforeViewportCards));
+  const after = Math.max(0, Math.floor(buffer.afterViewportCards));
+
+  return {
+    firstVisibleIndex: firstVisible,
+    lastVisibleIndex: lastVisible,
+    windowStartIndex: Math.max(0, firstVisible - before),
+    windowEndIndex: Math.min(maxIdx, lastVisible + after),
+  };
+}
+
 function logMainScrollRenderCountLimit(payload: {
   sourceCount: number;
   generatedCount: number;
@@ -446,8 +605,177 @@ export type MainSiteScrollCardsProps = {
   slideCardMoveSpeedLevel: number;
 };
 
+type MainSiteScrollCardsRenderCoreArgs = {
+  renderItems: MainSiteScrollCardItem[];
+  selectedItemId: string | null;
+  lcpHeroItemIndex: number;
+  initialPriorityIndexes: number[];
+  onCardPointerDown: (itemId: string) => void;
+  clearAutoDeselectTimer: () => void;
+  onLcpHeroImageLoad: () => void;
+  onLcpHeroImageError: () => void;
+  primarySegmentRef: Ref<HTMLDivElement>;
+  secondarySegmentRef: Ref<HTMLDivElement>;
+  viewportRef: Ref<HTMLDivElement>;
+  trackRef: Ref<HTMLDivElement>;
+  showMainShakeDiagCopyButton: boolean;
+};
+
+function renderMainSlideEngineV1(args: MainSiteScrollCardsRenderCoreArgs): React.ReactElement {
+  const renderSegment = (segmentKey: string, segmentRootRef?: Ref<HTMLDivElement>) => (
+    <div
+      className={`${styles.sampleMainMarqueeSegment} ${siteStyles.segmentMarqueeContents}`}
+      key={segmentKey}
+    >
+      {args.renderItems.map((item, itemIndex) => {
+        const rowKey = `${segmentKey}-${item.id}`;
+        const lcpHeroImage =
+          segmentKey === "a" && itemIndex === args.lcpHeroItemIndex && args.lcpHeroItemIndex >= 0;
+        const prioritizeNearViewportImage =
+          segmentKey === "a" && args.initialPriorityIndexes.includes(itemIndex);
+        return (
+          <div
+            key={rowKey}
+            className={siteStyles.marqueeCardSlotShell}
+            ref={itemIndex === 0 ? segmentRootRef : undefined}
+          >
+            <MainSiteCardRow
+              rowKey={rowKey}
+              item={item}
+              selected={args.selectedItemId === item.id}
+              onCardPointerDown={args.onCardPointerDown}
+              onShortcutActivate={args.clearAutoDeselectTimer}
+              lcpHeroImage={lcpHeroImage}
+              prioritizeNearViewportImage={prioritizeNearViewportImage}
+              onLcpHeroImageLoad={lcpHeroImage ? args.onLcpHeroImageLoad : undefined}
+              onLcpHeroImageError={lcpHeroImage ? args.onLcpHeroImageError : undefined}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <Fragment>
+      <div
+        className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
+        data-no-root-swipe
+        data-site-main-scroll-viewport="1"
+        data-site-main-scroll-deck="1"
+        ref={args.viewportRef}
+      >
+        <div
+          ref={args.trackRef}
+          className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}
+        >
+          {renderSegment("a", args.primarySegmentRef)}
+          {renderSegment("b", args.secondarySegmentRef)}
+          {args.selectedItemId !== null ? (
+            <div className={siteStyles.trackDimOverlay} aria-hidden />
+          ) : null}
+        </div>
+      </div>
+      {args.showMainShakeDiagCopyButton ? (
+        <button
+          type="button"
+          aria-label="떨림 로그 복사"
+          onClick={() => {
+            const fn = typeof window !== "undefined" ? window.__COPY_MAIN_SHAKE_DIAG__ : undefined;
+            if (fn) void fn();
+          }}
+          style={MAIN_SHAKE_DIAG_COPY_BUTTON_STYLE}
+        >
+          떨림 로그 복사
+        </button>
+      ) : null}
+    </Fragment>
+  );
+}
+
+/**
+ * v2 분기 준비(미완성): 플래그가 켜져도 현재 단계에서는 v1 결과를 그대로 반환한다.
+ * 다음 단계에서 v2 viewport-window 렌더를 연결한다.
+ */
+function renderMainSlideEngineV2OrFallback(args: MainSiteScrollCardsRenderCoreArgs): React.ReactElement {
+  const staticItems = args.renderItems.slice(0, 10);
+  const lcpHeroIndex = staticItems.findIndex((x) => Boolean(x.imageUrl?.trim()));
+  const eagerIndexes = new Set<number>();
+  for (let i = 0; i < staticItems.length; i++) {
+    if (!Boolean(staticItems[i]?.imageUrl?.trim())) continue;
+    eagerIndexes.add(i);
+    if (eagerIndexes.size >= INITIAL_EAGER_IMAGE_COUNT_PER_SEGMENT) break;
+  }
+
+  return (
+    <Fragment>
+      <div
+        className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
+        data-no-root-swipe
+        data-site-main-scroll-viewport="1"
+        data-site-main-scroll-deck="1"
+        data-site-main-scroll-engine="v2-static"
+        ref={args.viewportRef}
+      >
+        <div
+          ref={args.trackRef}
+          className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}
+        >
+          <div
+            className={`${styles.sampleMainMarqueeSegment} ${siteStyles.segmentMarqueeContents}`}
+            key="v2-static-segment"
+            ref={args.primarySegmentRef}
+          >
+            {staticItems.map((item, itemIndex) => {
+              const rowKey = `v2-${item.id}`;
+              const lcpHeroImage = itemIndex === lcpHeroIndex && lcpHeroIndex >= 0;
+              const prioritizeNearViewportImage = eagerIndexes.has(itemIndex);
+              return (
+                <div
+                  key={rowKey}
+                  className={siteStyles.marqueeCardSlotShell}
+                  ref={itemIndex === 0 ? args.secondarySegmentRef : undefined}
+                >
+                  <MainSiteCardRow
+                    rowKey={rowKey}
+                    item={item}
+                    selected={args.selectedItemId === item.id}
+                    onCardPointerDown={args.onCardPointerDown}
+                    onShortcutActivate={args.clearAutoDeselectTimer}
+                    lcpHeroImage={lcpHeroImage}
+                    prioritizeNearViewportImage={prioritizeNearViewportImage}
+                    onLcpHeroImageLoad={lcpHeroImage ? args.onLcpHeroImageLoad : undefined}
+                    onLcpHeroImageError={lcpHeroImage ? args.onLcpHeroImageError : undefined}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          {args.selectedItemId !== null ? (
+            <div className={siteStyles.trackDimOverlay} aria-hidden />
+          ) : null}
+        </div>
+      </div>
+      {args.showMainShakeDiagCopyButton ? (
+        <button
+          type="button"
+          aria-label="떨림 로그 복사"
+          onClick={() => {
+            const fn = typeof window !== "undefined" ? window.__COPY_MAIN_SHAKE_DIAG__ : undefined;
+            if (fn) void fn();
+          }}
+          style={MAIN_SHAKE_DIAG_COPY_BUTTON_STYLE}
+        >
+          떨림 로그 복사
+        </button>
+      ) : null}
+    </Fragment>
+  );
+}
+
 export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSiteScrollCardsProps) {
   const renderItems = useMemo(() => buildMarqueeRenderItems(items), [items]);
+  const useV2 = isMainSlideEngineV2Enabled();
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [autoSlideReady, setAutoSlideReady] = useState(false);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -569,6 +897,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   }, [items, lcpHeroItemIndex]);
 
   useLayoutEffect(() => {
+    if (useV2) return;
     if (typeof window === "undefined") return;
     if (items.length === 0 || !itemsIdsKey) {
       return;
@@ -677,7 +1006,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       if (roTimer != null) window.clearTimeout(roTimer);
       ro?.disconnect();
     };
-  }, [items.length, itemsIdsKey]);
+  }, [items.length, itemsIdsKey, useV2]);
 
   const clearCardSelection = useCallback(() => {
     setSelectedItemId(null);
@@ -751,6 +1080,10 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
   }, [clearCardSelection, selectedItemId]);
 
   useEffect(() => {
+    if (useV2) {
+      setAutoSlideReady(false);
+      return;
+    }
     if (items.length === 0) {
       setAutoSlideReady(false);
       return;
@@ -765,10 +1098,11 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       window.clearTimeout(timer);
       setAutoSlideReady(false);
     };
-  }, [itemsIdsKey, items.length]);
+  }, [itemsIdsKey, items.length, useV2]);
 
   /** 탭 이동·복귀 시에도 스크롤 위치가 반영되도록 언마운트만이 아닌 스크롤 중 저장 */
   useEffect(() => {
+    if (useV2) return;
     if (typeof window === "undefined") return;
     const node = viewportRef.current;
     if (!node || items.length === 0 || !itemsIdsKey) return;
@@ -802,7 +1136,7 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       node.removeEventListener("scroll", onScroll);
       if (throttleTimer != null) window.clearTimeout(throttleTimer);
     };
-  }, [itemsIdsKey, items.length]);
+  }, [itemsIdsKey, items.length, useV2]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -1154,74 +1488,20 @@ export function MainSiteScrollCards({ items, slideCardMoveSpeedLevel }: MainSite
       </Fragment>
     );
   }
-
-  const renderSegment = (segmentKey: string, segmentRootRef?: Ref<HTMLDivElement>) => (
-    <div
-      className={`${styles.sampleMainMarqueeSegment} ${siteStyles.segmentMarqueeContents}`}
-      key={segmentKey}
-    >
-      {renderItems.map((item, itemIndex) => {
-        const rowKey = `${segmentKey}-${item.id}`;
-        const lcpHeroImage =
-          segmentKey === "a" && itemIndex === lcpHeroItemIndex && lcpHeroItemIndex >= 0;
-        const prioritizeNearViewportImage =
-          segmentKey === "a" && initialPriorityIndexes.includes(itemIndex);
-        return (
-          <div
-            key={rowKey}
-            className={siteStyles.marqueeCardSlotShell}
-            ref={itemIndex === 0 ? segmentRootRef : undefined}
-          >
-            <MainSiteCardRow
-              rowKey={rowKey}
-              item={item}
-              selected={selectedItemId === item.id}
-              onCardPointerDown={onCardPointerDown}
-              onShortcutActivate={clearAutoDeselectTimer}
-              lcpHeroImage={lcpHeroImage}
-              prioritizeNearViewportImage={prioritizeNearViewportImage}
-              onLcpHeroImageLoad={lcpHeroImage ? onLcpHeroImageLoad : undefined}
-              onLcpHeroImageError={lcpHeroImage ? onLcpHeroImageError : undefined}
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
-
-  return (
-    <Fragment>
-      <div
-        className={`${styles.slideViewportSiteMain} ${siteStyles.viewportMarquee} ${siteStyles.viewportMarqueeLeadIn}`}
-        data-no-root-swipe
-        data-site-main-scroll-viewport="1"
-        data-site-main-scroll-deck="1"
-        ref={viewportRef}
-      >
-        <div
-          ref={trackRef}
-          className={`${styles.sampleMainMarqueeTrack} ${siteStyles.trackScrollStatic}`}
-        >
-          {renderSegment("a", primarySegmentRef)}
-          {renderSegment("b", secondarySegmentRef)}
-          {selectedItemId !== null ? (
-            <div className={siteStyles.trackDimOverlay} aria-hidden />
-          ) : null}
-        </div>
-      </div>
-      {showMainShakeDiagCopyButton ? (
-        <button
-          type="button"
-          aria-label="떨림 로그 복사"
-          onClick={() => {
-            const fn = typeof window !== "undefined" ? window.__COPY_MAIN_SHAKE_DIAG__ : undefined;
-            if (fn) void fn();
-          }}
-          style={MAIN_SHAKE_DIAG_COPY_BUTTON_STYLE}
-        >
-          떨림 로그 복사
-        </button>
-      ) : null}
-    </Fragment>
-  );
+  const renderArgs: MainSiteScrollCardsRenderCoreArgs = {
+    renderItems,
+    selectedItemId,
+    lcpHeroItemIndex,
+    initialPriorityIndexes,
+    onCardPointerDown,
+    clearAutoDeselectTimer,
+    onLcpHeroImageLoad,
+    onLcpHeroImageError,
+    primarySegmentRef,
+    secondarySegmentRef,
+    viewportRef,
+    trackRef,
+    showMainShakeDiagCopyButton,
+  };
+  return useV2 ? renderMainSlideEngineV2OrFallback(renderArgs) : renderMainSlideEngineV1(renderArgs);
 }
