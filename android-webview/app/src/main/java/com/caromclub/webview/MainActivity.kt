@@ -204,21 +204,15 @@ class MainActivity : AppCompatActivity() {
                 finish()
                 return@addCallback
             }
+            if (isAppRootWebUrl(webView.url)) {
+                handleBackPressExitToast()
+                return@addCallback
+            }
             if (webView.canGoBack()) {
                 webView.goBack()
                 return@addCallback
             }
-            if (!isMainHomeWebUrl(webView.url)) {
-                finish()
-                return@addCallback
-            }
-            val now = System.currentTimeMillis()
-            if (now - lastBackPressedTime < EXIT_INTERVAL_MS) {
-                finish()
-            } else {
-                Toast.makeText(this@MainActivity, EXIT_TOAST_MESSAGE, Toast.LENGTH_SHORT).show()
-                lastBackPressedTime = now
-            }
+            finish()
         }
 
         Log.i("CaromWebView", "loadUrl next — CaromPdfDownload must already be registered on webView")
@@ -403,26 +397,67 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    /**
-     * 공개 사이트 홈(`/`, `/site`)·클라이언트 홈(`/client`)만 메인으로 본다.
-     * 하위 경로(`/site/community` 등)는 메인이 아님.
-     */
-    private fun isMainHomeWebUrl(url: String?): Boolean {
-        if (url.isNullOrBlank()) return false
+    private fun handleBackPressExitToast() {
+        val now = System.currentTimeMillis()
+        if (now - lastBackPressedTime < EXIT_INTERVAL_MS) {
+            finish()
+        } else {
+            Toast.makeText(this@MainActivity, EXIT_TOAST_MESSAGE, Toast.LENGTH_SHORT).show()
+            lastBackPressedTime = now
+        }
+    }
+
+    private fun normalizedHttpPath(url: String?): String? {
+        if (url.isNullOrBlank()) return null
         val uri =
             try {
                 Uri.parse(url)
             } catch (_: Exception) {
-                return false
+                return null
             }
-        if (uri.scheme != "http" && uri.scheme != "https") return false
+        if (uri.scheme != "http" && uri.scheme != "https") return null
         val rawPath = uri.path
-        val path =
-            when {
-                rawPath.isNullOrEmpty() || rawPath == "/" -> "/"
-                rawPath.length > 1 && rawPath.endsWith("/") -> rawPath.dropLast(1)
-                else -> rawPath
-            }
+        return when {
+            rawPath.isNullOrEmpty() || rawPath == "/" -> "/"
+            rawPath.length > 1 && rawPath.endsWith("/") -> rawPath.dropLast(1)
+            else -> rawPath
+        }
+    }
+
+    /**
+     * 앱 루트·탭 루트 — 제스처 뒤로가기 시 WebView history와 무관하게 종료 토스트 우선.
+     * 상세·관리·편집 URL은 포함하지 않는다.
+     */
+    private fun isAppRootWebUrl(url: String?): Boolean {
+        val path = normalizedHttpPath(url) ?: return false
+        if (
+            path == "/" ||
+                path == "/site" ||
+                path == "/client" ||
+                path == "/site/tournaments" ||
+                path == "/site/mypage" ||
+                path == "/site/community" ||
+                path == "/platform"
+        ) {
+            return true
+        }
+        if (path.startsWith("/site/community/")) {
+            val segments = path.removePrefix("/site/community/").split('/').filter { it.isNotEmpty() }
+            if (segments.isEmpty()) return true
+            if (segments.size != 1) return false
+            val board = segments[0]
+            if (board == "write" || board == "preview") return false
+            return true
+        }
+        return false
+    }
+
+    /**
+     * 공개 사이트 홈(`/`, `/site`)·클라이언트 홈(`/client`)만 메인으로 본다.
+     * (레거시 명칭 — 제스처 종료 판단은 [isAppRootWebUrl] 사용)
+     */
+    private fun isMainHomeWebUrl(url: String?): Boolean {
+        val path = normalizedHttpPath(url) ?: return false
         return path == "/" || path == "/site" || path == "/client"
     }
 
